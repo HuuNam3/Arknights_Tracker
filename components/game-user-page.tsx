@@ -44,6 +44,7 @@ import {
   ChevronUp,
   ChevronLeft,
   History,
+  Wrench,
   Users,
   GalleryHorizontal,
   Plus,
@@ -250,6 +251,138 @@ const translateGameTerms = (html: string) => {
   return translated;
 };
 
+const RECRUITMENT_TAGS = [
+  "Top Operator",
+  "Senior Operator",
+  "Crowd-Control",
+  "Nuker",
+  "Robot",
+  "Starter",
+  "Shift",
+  "Fast-Redeploy",
+  "Debuff",
+  "Specialist",
+  "Summon",
+  "Healing",
+  "DP-Recovery",
+  "Vanguard",
+  "Defender",
+  "Guard",
+  "Medic",
+  "Sniper",
+  "Caster",
+  "Support",
+  "AoE",
+  "Slow",
+  "Supporter",
+  "Melee",
+  "Ranged",
+  "Defense",
+  "Survival",
+  "DPS",
+] as const;
+
+type RecruitmentOperator = {
+  name: string;
+  rarity: 1 | 2 | 3 | 4 | 5 | 6;
+  tags: string[];
+};
+
+const RECRUITMENT_OPERATORS: RecruitmentOperator[] = [
+  { name: "Exusiai", rarity: 6, tags: ["Top Operator", "Sniper", "Ranged", "DPS"] },
+  { name: "Siege", rarity: 6, tags: ["Top Operator", "Vanguard", "Melee", "DP-Recovery", "DPS"] },
+  { name: "Shining", rarity: 6, tags: ["Top Operator", "Medic", "Ranged", "Healing", "Support"] },
+  { name: "Nightingale", rarity: 6, tags: ["Top Operator", "Medic", "Ranged", "Healing", "Support"] },
+  { name: "SilverAsh", rarity: 6, tags: ["Top Operator", "Guard", "Melee", "DPS", "Support"] },
+  { name: "Hoshiguma", rarity: 6, tags: ["Top Operator", "Defender", "Melee", "Defense", "DPS"] },
+  { name: "Saria", rarity: 6, tags: ["Top Operator", "Defender", "Melee", "Defense", "Healing", "Support"] },
+  { name: "Ifrit", rarity: 6, tags: ["Top Operator", "Caster", "Ranged", "AoE", "Debuff", "DPS"] },
+  { name: "Mostima", rarity: 6, tags: ["Top Operator", "Caster", "Ranged", "AoE", "Support", "Crowd-Control"] },
+  { name: "Schwarz", rarity: 6, tags: ["Top Operator", "Sniper", "Ranged", "DPS"] },
+  { name: "Hellagur", rarity: 6, tags: ["Top Operator", "Guard", "Melee", "DPS", "Survival"] },
+  { name: "Aak", rarity: 6, tags: ["Top Operator", "Specialist", "Ranged", "Support", "Debuff", "DPS"] },
+  { name: "Blaze", rarity: 6, tags: ["Top Operator", "Guard", "Melee", "AoE", "DPS", "Survival"] },
+  { name: "Ceobe", rarity: 6, tags: ["Top Operator", "Caster", "Ranged", "DPS"] },
+  { name: "Bagpipe", rarity: 6, tags: ["Top Operator", "Vanguard", "Melee", "DP-Recovery", "DPS"] },
+
+  { name: "Texas", rarity: 5, tags: ["Senior Operator", "Vanguard", "Melee", "DP-Recovery", "Crowd-Control"] },
+  { name: "Ptilopsis", rarity: 5, tags: ["Senior Operator", "Medic", "Ranged", "Healing", "Support"] },
+  { name: "Silence", rarity: 5, tags: ["Senior Operator", "Medic", "Ranged", "Healing"] },
+  { name: "Warfarin", rarity: 5, tags: ["Senior Operator", "Medic", "Ranged", "Healing", "Support"] },
+  { name: "Nearl", rarity: 5, tags: ["Senior Operator", "Defender", "Melee", "Defense", "Healing"] },
+  { name: "Liskarm", rarity: 5, tags: ["Senior Operator", "Defender", "Melee", "Defense", "Support", "DPS"] },
+  { name: "Croissant", rarity: 5, tags: ["Senior Operator", "Defender", "Melee", "Defense", "Shift"] },
+  { name: "Projekt Red", rarity: 5, tags: ["Senior Operator", "Specialist", "Melee", "Fast-Redeploy", "Crowd-Control", "DPS"] },
+  { name: "Cliffheart", rarity: 5, tags: ["Senior Operator", "Specialist", "Melee", "Shift", "DPS"] },
+  { name: "FEater", rarity: 5, tags: ["Senior Operator", "Specialist", "Melee", "Shift", "Support"] },
+  { name: "Mayer", rarity: 5, tags: ["Senior Operator", "Supporter", "Ranged", "Support", "Summon", "Crowd-Control"] },
+  { name: "Pramanix", rarity: 5, tags: ["Senior Operator", "Supporter", "Ranged", "Debuff", "Support"] },
+  { name: "Blue Poison", rarity: 5, tags: ["Senior Operator", "Sniper", "Ranged", "DPS"] },
+  { name: "Meteorite", rarity: 5, tags: ["Senior Operator", "Sniper", "Ranged", "AoE", "DPS"] },
+  { name: "Firewatch", rarity: 5, tags: ["Senior Operator", "Sniper", "Ranged", "DPS", "Nuker"] },
+  { name: "Manticore", rarity: 5, tags: ["Senior Operator", "Specialist", "Melee", "Survival", "DPS", "Crowd-Control"] },
+  { name: "Lappland", rarity: 5, tags: ["Senior Operator", "Guard", "Melee", "DPS", "Debuff"] },
+  { name: "Specter", rarity: 5, tags: ["Senior Operator", "Guard", "Melee", "AoE", "DPS", "Survival"] },
+  { name: "Vulcan", rarity: 5, tags: ["Senior Operator", "Defender", "Melee", "Defense", "Survival", "DPS"] },
+
+  { name: "Myrtle", rarity: 4, tags: ["Vanguard", "Melee", "DP-Recovery", "Healing", "Support"] },
+  { name: "Gravel", rarity: 4, tags: ["Specialist", "Melee", "Fast-Redeploy", "Defense"] },
+  { name: "Rope", rarity: 4, tags: ["Specialist", "Melee", "Shift"] },
+  { name: "Shaw", rarity: 4, tags: ["Specialist", "Melee", "Shift"] },
+  { name: "Courier", rarity: 4, tags: ["Vanguard", "Melee", "DP-Recovery", "Defense"] },
+  { name: "Scavenger", rarity: 4, tags: ["Vanguard", "Melee", "DP-Recovery", "DPS"] },
+  { name: "Perfumer", rarity: 4, tags: ["Medic", "Ranged", "Healing", "Support"] },
+  { name: "Gavial", rarity: 4, tags: ["Medic", "Ranged", "Healing"] },
+  { name: "Haze", rarity: 4, tags: ["Caster", "Ranged", "DPS", "Debuff"] },
+  { name: "Gitano", rarity: 4, tags: ["Caster", "Ranged", "AoE", "DPS"] },
+  { name: "Shirayuki", rarity: 4, tags: ["Sniper", "Ranged", "AoE", "Slow"] },
+  { name: "Meteor", rarity: 4, tags: ["Sniper", "Ranged", "DPS", "Debuff"] },
+  { name: "Vermeil", rarity: 4, tags: ["Sniper", "Ranged", "DPS"] },
+  { name: "Cuora", rarity: 4, tags: ["Defender", "Melee", "Defense"] },
+  { name: "Gummy", rarity: 4, tags: ["Defender", "Melee", "Defense", "Healing"] },
+  { name: "Deepcolor", rarity: 4, tags: ["Supporter", "Ranged", "Support", "Summon"] },
+  { name: "Earthspirit", rarity: 4, tags: ["Supporter", "Ranged", "Slow", "Support"] },
+  { name: "Mousse", rarity: 4, tags: ["Guard", "Melee", "DPS", "Debuff"] },
+  { name: "Estelle", rarity: 4, tags: ["Guard", "Melee", "AoE", "Survival"] },
+  { name: "Frostleaf", rarity: 4, tags: ["Guard", "Melee", "DPS", "Slow"] },
+  { name: "Jessica", rarity: 4, tags: ["Sniper", "Ranged", "DPS", "Survival"] },
+
+  { name: "Fang", rarity: 3, tags: ["Starter", "Vanguard", "Melee", "DP-Recovery", "Defense"] },
+  { name: "Vanilla", rarity: 3, tags: ["Starter", "Vanguard", "Melee", "DP-Recovery", "DPS"] },
+  { name: "Plume", rarity: 3, tags: ["Starter", "Vanguard", "Melee", "DP-Recovery", "DPS"] },
+  { name: "Kroos", rarity: 3, tags: ["Starter", "Sniper", "Ranged", "DPS"] },
+  { name: "Adnachiel", rarity: 3, tags: ["Starter", "Sniper", "Ranged", "DPS"] },
+  { name: "Catapult", rarity: 3, tags: ["Starter", "Sniper", "Ranged", "AoE"] },
+  { name: "Steward", rarity: 3, tags: ["Starter", "Caster", "Ranged", "DPS"] },
+  { name: "Lava", rarity: 3, tags: ["Starter", "Caster", "Ranged", "AoE"] },
+  { name: "Orchid", rarity: 3, tags: ["Starter", "Supporter", "Ranged", "Slow"] },
+  { name: "Melantha", rarity: 3, tags: ["Starter", "Guard", "Melee", "DPS"] },
+  { name: "Midnight", rarity: 3, tags: ["Starter", "Guard", "Melee", "DPS"] },
+  { name: "Popukar", rarity: 3, tags: ["Starter", "Guard", "Melee", "AoE"] },
+  { name: "Beagle", rarity: 3, tags: ["Starter", "Defender", "Melee", "Defense"] },
+  { name: "Spot", rarity: 3, tags: ["Starter", "Defender", "Melee", "Defense", "Healing"] },
+  { name: "Cardigan", rarity: 3, tags: ["Starter", "Defender", "Melee", "Defense", "Survival"] },
+  { name: "Ansel", rarity: 3, tags: ["Starter", "Medic", "Ranged", "Healing"] },
+  { name: "Hibiscus", rarity: 3, tags: ["Starter", "Medic", "Ranged", "Healing"] },
+
+  { name: "Yato", rarity: 2, tags: ["Starter", "Vanguard", "Melee", "DP-Recovery"] },
+  { name: "Rangers", rarity: 2, tags: ["Starter", "Sniper", "Ranged", "DPS"] },
+  { name: "Durin", rarity: 2, tags: ["Starter", "Caster", "Ranged", "DPS"] },
+  { name: "12F", rarity: 2, tags: ["Starter", "Caster", "Ranged", "AoE"] },
+  { name: "Noir Corne", rarity: 2, tags: ["Starter", "Defender", "Melee", "Defense"] },
+
+  { name: "Lancet-2", rarity: 1, tags: ["Robot", "Medic", "Ranged", "Healing", "Support"] },
+  { name: "Castle-3", rarity: 1, tags: ["Robot", "Guard", "Melee", "Support", "DPS"] },
+  { name: "THRM-EX", rarity: 1, tags: ["Robot", "Specialist", "Melee", "Fast-Redeploy", "Nuker"] },
+  { name: "Justice Knight", rarity: 1, tags: ["Robot", "Sniper", "Ranged", "Support"] },
+  { name: "Friston-3", rarity: 1, tags: ["Robot", "Defender", "Melee", "Defense"] },
+];
+
+const parseNumberInput = (value: string) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 // Helper: Operators with Japanese-style name order (Family Given) that need reversal for wiki URLs
 const REVERSED_NAME_OPERATORS = new Set([
   "Sakiko Togawa",
@@ -280,6 +413,16 @@ const getOperatorAvatarFallback = (name: string) =>
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+
+const TOOL_ICON_URLS = {
+  headhuntingPermit:
+    "https://arknights.wiki.gg/images/Headhunting_Permit.png",
+  originiumShard:
+    "https://arknights.wiki.gg/images/Originium_Shard.png",
+  originitePrime:
+    "https://arknights.wiki.gg/images/Originite_Prime.png",
+  orundum: "https://arknights.wiki.gg/images/Orundum.png",
+} as const;
 
 const normalizeTierOrder = (value: unknown) => {
   if (!Array.isArray(value)) {
@@ -445,6 +588,7 @@ type BannerRelease = {
   limited: boolean;
   name: string;
   operators: string[];
+  operatorRarities: Record<string, string>;
   releaseDate: string;
   releaseTs: number;
 };
@@ -652,20 +796,11 @@ const getOperatorRarityValue = (operator: OperatorRelease) => {
   return null;
 };
 
-const isLikelyCharacterBannerName = (value: string) =>
-  !/Joint Operation|Kernel|Celebration|Orienteering|Locating|Vision|Banner/i.test(
-    value,
-  ) && !/#\d+/.test(value);
+const LIMITED_BANNER_KEYWORD_REGEX =
+  /limited|celebration|festival|carnival|crossover|collaboration|vision/i;
 
-const getNormalizedBannerOperatorNames = (banner: BannerRelease) => {
-  const operators =
-    isLikelyCharacterBannerName(banner.name) &&
-    !banner.operators.includes(banner.name)
-      ? [banner.name, ...banner.operators]
-      : banner.operators;
-
-  return operators.filter((name) => !isBannerArtifactName(name));
-};
+const getNormalizedBannerOperatorNames = (banner: BannerRelease) =>
+  banner.operators.filter((name) => !isBannerArtifactName(name));
 
 const getBannerKey = (banner: BannerRelease) =>
   `${banner.name}-${banner.cnStartDate ?? "cn"}-${banner.enStartDate ?? "en"}`;
@@ -993,7 +1128,20 @@ export function GameUserPage() {
   const [isNewsLoading, setIsNewsLoading] = useState(false);
   const [newsPage, setNewsPage] = useState(1);
   const [newsTotalPages, setNewsTotalPages] = useState(1);
-  const [activeTab, setActiveTab] = useState("characters");
+  const [activeTab, setActiveTab] = useState("tools");
+  const [pullPlanner, setPullPlanner] = useState({
+    currentBannerKey: "",
+    dailyMissionEnabled: true,
+    originiumShards: "0",
+    originitePrime: "0",
+    orundum: "0",
+    permits: "0",
+    weeklyMissionEnabled: true,
+    weeklyRegularOrundum: "1800",
+  });
+  const [selectedRecruitmentTags, setSelectedRecruitmentTags] = useState<string[]>(
+    [],
+  );
   const [cookieToken, setCookieToken] = useState("");
   const [gachaData, setGachaData] = useState<any[] | null>(null);
   const [gachaAllData, setGachaAllData] = useState<any[] | null>(null);
@@ -1049,6 +1197,38 @@ export function GameUserPage() {
     currentSanity !== null ? Math.max(0, sanityCap - currentSanity) : null;
   const recoveryMinutes =
     missingSanity !== null ? missingSanity * 6 : null;
+  const plannerOrundum = Math.max(0, parseNumberInput(pullPlanner.orundum));
+  const plannerPrime = Math.max(0, parseNumberInput(pullPlanner.originitePrime));
+  const plannerPermits = Math.max(0, parseNumberInput(pullPlanner.permits));
+  const plannerShards = Math.max(0, Math.floor(parseNumberInput(pullPlanner.originiumShards)));
+  const plannerShardOrundum = Math.floor(plannerShards / 2) * 20;
+  const plannerCurrentOrundum =
+    plannerOrundum + plannerPrime * 180 + plannerShardOrundum;
+  const plannerCurrentPulls =
+    plannerPermits + Math.floor(plannerCurrentOrundum / 600);
+  const plannerCurrentLeftoverOrundum = plannerCurrentOrundum % 600;
+  const limitedOperatorNames = new Set(
+    operatorData
+      .filter((operator) => operator.limited)
+      .map((operator) => operator.name.toLowerCase()),
+  );
+  const isBannerLimited = (banner: BannerRelease) =>
+    banner.limited ||
+    LIMITED_BANNER_KEYWORD_REGEX.test(`${banner.category} ${banner.name}`) ||
+    getNormalizedBannerOperatorNames(banner).some((operatorName) =>
+      limitedOperatorNames.has(operatorName.toLowerCase()),
+    );
+  const filteredRecruitmentOperators = RECRUITMENT_OPERATORS
+    .filter((operator) =>
+      selectedRecruitmentTags.every((tag) => operator.tags.includes(tag)),
+    )
+    .sort((left, right) => {
+      if (left.rarity !== right.rarity) {
+        return right.rarity - left.rarity;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
   const combinedOperatorData = (() => {
     const releasedOperators = operatorData.filter((operator) =>
       operator.globalReleased,
@@ -1118,9 +1298,9 @@ export function GameUserPage() {
           enReleaseDate: null,
           event: knownOperator?.event ?? banner.name,
           globalReleased: false,
-          limited: knownOperator?.limited ?? banner.limited,
+          limited: knownOperator?.limited ?? isBannerLimited(banner),
           name: operatorName,
-          rarity: knownOperator?.rarity ?? "?",
+          rarity: knownOperator?.rarity ?? banner.operatorRarities[operatorName] ?? "?",
           releaseDate: nextReleaseDate,
           releaseTs: nextReleaseTs,
         });
@@ -1239,6 +1419,73 @@ export function GameUserPage() {
 
     return predictions;
   })();
+  const plannerTodayIso = new Date().toISOString().slice(0, 10);
+  const plannerTodayTs = parseIsoDate(plannerTodayIso) ?? Date.now();
+  const pullPlannerTargets = bannerData
+    .map((banner) => {
+      const predictedDate =
+        banner.enStartDate ??
+        (!banner.enStartDate && banner.cnStartDate
+          ? formatIsoDate(
+              (parseIsoDate(banner.cnStartDate) ?? banner.releaseTs) +
+                bannerReleaseLagDays * DAY_MS,
+            )
+          : null);
+
+      if (!predictedDate) {
+        return null;
+      }
+
+      const predictedTs = parseIsoDate(predictedDate);
+      if (predictedTs === null || predictedTs < plannerTodayTs) {
+        return null;
+      }
+
+      return {
+        date: predictedDate,
+        dateLabel: formatDisplayDate(predictedDate) ?? predictedDate,
+        id: getBannerKey(banner),
+        isPredicted: !banner.enStartDate,
+        name: banner.name,
+      };
+    })
+    .filter((target): target is NonNullable<typeof target> => target !== null)
+    .sort((left, right) => left.date.localeCompare(right.date));
+  const selectedPullPlannerTarget =
+    pullPlannerTargets.find((target) => target.id === pullPlanner.currentBannerKey) ??
+    pullPlannerTargets[0] ??
+    null;
+  const plannerDaysUntilBanner = selectedPullPlannerTarget
+    ? Math.max(
+        0,
+        Math.ceil(
+          ((parseIsoDate(selectedPullPlannerTarget.date) ?? plannerTodayTs) -
+            plannerTodayTs) /
+            DAY_MS,
+        ),
+      )
+    : 0;
+  const plannerWeeksUntilBanner = Math.floor(plannerDaysUntilBanner / 7);
+  const plannerWeeklyRegularOrundum = Math.min(
+    1800,
+    Math.max(0, parseNumberInput(pullPlanner.weeklyRegularOrundum)),
+  );
+  const plannerFutureDailyOrundum = pullPlanner.dailyMissionEnabled
+    ? plannerDaysUntilBanner * 100
+    : 0;
+  const plannerFutureWeeklyMissionOrundum = pullPlanner.weeklyMissionEnabled
+    ? plannerWeeksUntilBanner * 500
+    : 0;
+  const plannerFutureRegularOrundum =
+    plannerWeeksUntilBanner * plannerWeeklyRegularOrundum;
+  const plannerFutureOrundum =
+    plannerFutureDailyOrundum +
+    plannerFutureWeeklyMissionOrundum +
+    plannerFutureRegularOrundum;
+  const plannerProjectedOrundum = plannerCurrentOrundum + plannerFutureOrundum;
+  const plannerProjectedPulls =
+    plannerPermits + Math.floor(plannerProjectedOrundum / 600);
+  const plannerProjectedLeftoverOrundum = plannerProjectedOrundum % 600;
   const filteredBanners = [...bannerData]
     .sort((a, b) => {
       const aIsReleased = Boolean(a.enStartDate);
@@ -1751,6 +1998,15 @@ export function GameUserPage() {
   }, [savedTierLists]);
 
   useEffect(() => {
+    if (!pullPlanner.currentBannerKey && pullPlannerTargets[0]) {
+      setPullPlanner((current) => ({
+        ...current,
+        currentBannerKey: pullPlannerTargets[0].id,
+      }));
+    }
+  }, [pullPlanner.currentBannerKey, pullPlannerTargets]);
+
+  useEffect(() => {
     setGachaPage(1);
 
     if (!gachaAttempted || !cookieToken.trim()) {
@@ -1982,6 +2238,30 @@ export function GameUserPage() {
     }
   };
 
+  const handlePullPlannerChange = (
+    field: keyof typeof pullPlanner,
+    value: string | boolean,
+  ) => {
+    setPullPlanner((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleToggleRecruitmentTag = (tag: string) => {
+    setSelectedRecruitmentTags((current) => {
+      if (current.includes(tag)) {
+        return current.filter((value) => value !== tag);
+      }
+
+      if (current.length >= 3) {
+        return current;
+      }
+
+      return [...current, tag];
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8 relative overflow-hidden font-sans selection:bg-cyan-500/30">
       {/* Decorative Background Elements */}
@@ -2055,7 +2335,8 @@ export function GameUserPage() {
             />
           </div>
           <p className="text-slate-500 text-lg md:text-xl font-medium max-w-2xl mx-auto">
-            Tra cứu tài khoản, theo dõi tin tức và kiểm tra lịch sử gacha Arknights.
+            Theo dõi Characters, Banners, Tier List, Tools, Tin tức và lịch sử
+            Gacha cho Arknights trong một nơi.
           </p>
         </div>
 
@@ -2177,69 +2458,6 @@ export function GameUserPage() {
 
               <Separator className="my-6 bg-slate-200/80" />
 
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_1fr] gap-6">
-                <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Zap className="w-5 h-5 text-amber-500" />
-                    <h3 className="text-slate-800 font-bold text-lg">
-                      Máy tính sanity
-                    </h3>
-                  </div>
-                  <p className="text-slate-500 text-sm mb-3">
-                    Nhập lượng sanity hiện tại để tính số còn thiếu và
-                    thời gian hồi đầy với tốc độ 1 sanity mỗi 6 phút.
-                  </p>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={sanityCap}
-                    inputMode="numeric"
-                    value={currentSanityInput}
-                    onChange={(e) => hydrateSanityFromInput(e.target.value)}
-                    placeholder={`Nhập sanity hiện tại (0 - ${sanityCap})`}
-                    className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:ring-amber-400/20 h-12 text-lg rounded-xl"
-                  />
-                  <p className="text-xs text-slate-400 mt-2">
-                    Nếu nhập vượt giới hạn, hệ thống sẽ tự giới hạn về {sanityCap}.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
-                    <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
-                      Sanity hiện tại
-                    </p>
-                    <p className="text-slate-800 text-3xl font-black tracking-tight">
-                      {currentSanity !== null ? currentSanity : "--"}
-                    </p>
-                  </div>
-                  <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
-                    <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
-                      Còn thiếu
-                    </p>
-                    <p className="text-rose-500 text-3xl font-black tracking-tight">
-                      {missingSanity !== null ? missingSanity : "--"}
-                    </p>
-                  </div>
-                  <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
-                    <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
-                      Đầy sau
-                    </p>
-                    <p className="text-emerald-600 text-2xl font-black tracking-tight">
-                      {recoveryMinutes !== null
-                        ? formatRecoveryDuration(recoveryMinutes)
-                        : "--"}
-                    </p>
-                    <p className="text-slate-400 text-xs mt-2">
-                      {recoveryMinutes !== null
-                        ? recoveryMinutes === 0
-                          ? "Đã đầy"
-                          : `Đầy lúc ${formatRecoveryDateTime(recoveryMinutes)}`
-                        : "Nhập sanity để bắt đầu tính"}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         ) : errorMessage ? (
@@ -2258,7 +2476,14 @@ export function GameUserPage() {
               onValueChange={setActiveTab}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-white/70 backdrop-blur-xl border border-slate-200/80 p-1.5 rounded-2xl shadow-sm mb-6 h-auto gap-1.5">
+              <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 bg-white/70 backdrop-blur-xl border border-slate-200/80 p-1.5 rounded-2xl shadow-sm mb-6 h-auto gap-1.5">
+                <TabsTrigger
+                  value="tools"
+                  className="py-3 text-slate-500 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
+                >
+                  <Wrench className="w-5 h-5 mr-2" />
+                  Tools
+                </TabsTrigger>
                 <TabsTrigger
                   value="characters"
                   className="py-3 text-slate-500 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:border-emerald-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
@@ -2297,6 +2522,515 @@ export function GameUserPage() {
               </TabsList>
 
               <TabsContent
+                value="tools"
+                className="mt-0 focus-visible:outline-none space-y-6"
+              >
+                <Card className="glass-card border-0 shadow-sm overflow-hidden">
+                  <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-orange-500 to-yellow-500" />
+                  <CardHeader className="pb-4 bg-white/30 border-b border-slate-100">
+                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
+                      <div className="p-2 bg-amber-100 rounded-lg border border-amber-200">
+                        <Wrench className="w-6 h-6 text-amber-600" />
+                      </div>
+                      Tools
+                    </CardTitle>
+                    <CardDescription className="text-slate-500 text-base">
+                      Tập hợp các công cụ tính toán và theo dõi nhanh để hỗ trợ
+                      quá trình chơi Arknights mỗi ngày.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-6">
+                    {userInfo ? (
+                      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_1fr] gap-6">
+                        <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
+                          <div className="flex items-center justify-between gap-3 mb-4">
+                            <div className="flex items-center gap-2">
+                              <Zap className="w-5 h-5 text-amber-500" />
+                              <h3 className="text-slate-800 font-bold text-lg">
+                                Máy tính sanity
+                              </h3>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className="bg-white border-slate-200 text-slate-600"
+                            >
+                              Cap {sanityCap}
+                            </Badge>
+                          </div>
+                          <p className="text-slate-500 text-sm mb-3">
+                            Nhập lượng sanity hiện tại để tính số còn thiếu và thời gian
+                            hồi đầy với tốc độ 1 sanity mỗi 6 phút.
+                          </p>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={sanityCap}
+                            inputMode="numeric"
+                            value={currentSanityInput}
+                            onChange={(e) => hydrateSanityFromInput(e.target.value)}
+                            placeholder={`Nhập sanity hiện tại (0 - ${sanityCap})`}
+                            className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:ring-amber-400/20 h-12 text-lg rounded-xl"
+                          />
+                          <p className="text-xs text-slate-400 mt-2">
+                            Nếu nhập vượt giới hạn, hệ thống sẽ tự giới hạn về {sanityCap}.
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
+                            <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
+                              Sanity hiện tại
+                            </p>
+                            <p className="text-slate-800 text-3xl font-black tracking-tight">
+                              {currentSanity !== null ? currentSanity : "--"}
+                            </p>
+                          </div>
+                          <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
+                            <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
+                              Còn thiếu
+                            </p>
+                            <p className="text-rose-500 text-3xl font-black tracking-tight">
+                              {missingSanity !== null ? missingSanity : "--"}
+                            </p>
+                          </div>
+                          <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
+                            <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
+                              Đầy sau
+                            </p>
+                            <p className="text-emerald-600 text-2xl font-black tracking-tight">
+                              {recoveryMinutes !== null
+                                ? formatRecoveryDuration(recoveryMinutes)
+                                : "--"}
+                            </p>
+                            <p className="text-slate-400 text-xs mt-2">
+                              {recoveryMinutes !== null
+                                ? recoveryMinutes === 0
+                                  ? "Đã đầy"
+                                  : `Đầy lúc ${formatRecoveryDateTime(recoveryMinutes)}`
+                                : "Nhập sanity để bắt đầu tính"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <Alert className="border-amber-200 bg-amber-50 text-amber-900 rounded-xl">
+                        <AlertCircle className="h-5 w-5 text-amber-600" />
+                        <AlertDescription className="ml-2 font-medium text-base">
+                          Nhập UID ở phía trên để lấy level Doctor và dùng máy tính sanity.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                      <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-slate-800 font-bold text-lg">Pull Planner</p>
+                            <p className="text-slate-500 text-sm mt-1">
+                              Tính pull hiện có và ước tính số pull tích lũy được
+                              tới banner mục tiêu.
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="bg-white border-slate-200 text-slate-600"
+                          >
+                            Banner planner
+                          </Badge>
+                        </div>
+
+                        {pullPlannerTargets.length > 0 ? (
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-slate-700">
+                              Banner mục tiêu
+                            </label>
+                            <select
+                              value={selectedPullPlannerTarget?.id ?? ""}
+                              onChange={(e) =>
+                                handlePullPlannerChange("currentBannerKey", e.target.value)
+                              }
+                              className="w-full h-12 rounded-xl border border-slate-200 bg-white/80 px-4 text-slate-800"
+                            >
+                              {pullPlannerTargets.map((target) => (
+                                <option key={target.id} value={target.id}>
+                                  {target.name} - {target.dateLabel}
+                                  {target.isPredicted ? " (Dự đoán)" : " (Đã xác nhận)"}
+                                </option>
+                              ))}
+                            </select>
+                            {selectedPullPlannerTarget ? (
+                              <p className="text-xs text-slate-500">
+                                {selectedPullPlannerTarget.isPredicted
+                                  ? "Ngày trên là ngày dự đoán từ CN sang Global."
+                                  : "Ngày trên là ngày banner đã có lịch Global."}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <Alert className="border-slate-200 bg-slate-50 text-slate-700 rounded-xl">
+                            <AlertCircle className="h-5 w-5 text-slate-500" />
+                            <AlertDescription className="ml-2 text-sm">
+                              Chưa có banner tương lai để lên kế hoạch.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <img
+                                src={TOOL_ICON_URLS.orundum}
+                                alt="Orundum"
+                                className="size-5 object-contain"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            </div>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={pullPlanner.orundum}
+                              onChange={(e) =>
+                                handlePullPlannerChange("orundum", e.target.value)
+                              }
+                              placeholder="Orundum"
+                              className="bg-white/80 border-slate-200 rounded-xl pl-10"
+                            />
+                          </div>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <img
+                                src={TOOL_ICON_URLS.originitePrime}
+                                alt="Originite Prime"
+                                className="size-5 object-contain"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            </div>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={pullPlanner.originitePrime}
+                              onChange={(e) =>
+                                handlePullPlannerChange("originitePrime", e.target.value)
+                              }
+                              placeholder="Originite Prime"
+                              className="bg-white/80 border-slate-200 rounded-xl pl-10"
+                            />
+                          </div>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <img
+                                src={TOOL_ICON_URLS.headhuntingPermit}
+                                alt="Headhunting Permit"
+                                className="size-5 object-contain"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            </div>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={pullPlanner.permits}
+                              onChange={(e) =>
+                                handlePullPlannerChange("permits", e.target.value)
+                              }
+                              placeholder="Headhunting Permit"
+                              className="bg-white/80 border-slate-200 rounded-xl pl-10"
+                            />
+                          </div>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <img
+                                src={TOOL_ICON_URLS.originiumShard}
+                                alt="Originium Shard"
+                                className="size-5 object-contain"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            </div>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={pullPlanner.originiumShards}
+                              onChange={(e) =>
+                                handlePullPlannerChange("originiumShards", e.target.value)
+                              }
+                              placeholder="Originium Shard"
+                              className="bg-white/80 border-slate-200 rounded-xl pl-10"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <label className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={pullPlanner.dailyMissionEnabled}
+                              onChange={(e) =>
+                                handlePullPlannerChange(
+                                  "dailyMissionEnabled",
+                                  e.target.checked,
+                                )
+                              }
+                              className="size-4 accent-amber-600"
+                            />
+                            <div>
+                              <p className="font-semibold text-slate-800">
+                                Daily mission
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                100 Orundum / ngày
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={pullPlanner.weeklyMissionEnabled}
+                              onChange={(e) =>
+                                handlePullPlannerChange(
+                                  "weeklyMissionEnabled",
+                                  e.target.checked,
+                                )
+                              }
+                              className="size-4 accent-amber-600"
+                            />
+                            <div>
+                              <p className="font-semibold text-slate-800">
+                                Weekly mission
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                500 Orundum / tuần
+                              </p>
+                            </div>
+                          </label>
+
+                          <div className="bg-white rounded-xl border border-slate-100 p-4">
+                            <p className="font-semibold text-slate-800 mb-2">
+                              Regular tasks mỗi tuần
+                            </p>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={1800}
+                              value={pullPlanner.weeklyRegularOrundum}
+                              onChange={(e) =>
+                                handlePullPlannerChange(
+                                  "weeklyRegularOrundum",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="0 - 1800"
+                              className="bg-white/80 border-slate-200 rounded-xl"
+                            />
+                            <p className="text-xs text-slate-500 mt-2">
+                              Tối đa 1800 Orundum / tuần.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="bg-white rounded-xl border border-slate-100 p-4">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">
+                              Pull hiện có
+                            </p>
+                            <p className="text-2xl font-black text-slate-800 mt-1">
+                              {plannerCurrentPulls}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-xl border border-slate-100 p-4">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">
+                              Pull tới banner
+                            </p>
+                            <p className="text-2xl font-black text-emerald-600 mt-1">
+                              {plannerProjectedPulls}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-xl border border-slate-100 p-4">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">
+                              Còn lại
+                            </p>
+                            <p className="text-2xl font-black text-rose-500 mt-1">
+                              {plannerDaysUntilBanner} ngày
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-xl border border-slate-100 p-4">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">
+                              Orundum kiếm thêm
+                            </p>
+                            <p className="text-2xl font-black text-sky-600 mt-1">
+                              {plannerFutureOrundum}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="bg-white rounded-xl border border-slate-100 p-4">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">
+                              Orundum hiện có
+                            </p>
+                            <p className="text-xl font-black text-slate-800 mt-1">
+                              {plannerCurrentOrundum}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-2">
+                              Bao gồm Orundum, Originite Prime và Originium Shard
+                              quy đổi.
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-xl border border-slate-100 p-4">
+                            <p className="text-xs text-slate-500 uppercase font-semibold">
+                              Dư khi đổi pull
+                            </p>
+                            <p className="text-xl font-black text-slate-800 mt-1">
+                              {plannerProjectedLeftoverOrundum}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-2">
+                              Hiện tại dư {plannerCurrentLeftoverOrundum} Orundum sau quy đổi.
+                            </p>
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-slate-500">
+                          {selectedPullPlannerTarget
+                            ? `Tính từ hôm nay tới ${selectedPullPlannerTarget.name} còn ${plannerDaysUntilBanner} ngày, tương đương ${plannerWeeksUntilBanner} tuần tròn để cộng weekly income.`
+                            : "Chọn một banner tương lai để bắt đầu tính."}
+                        </p>
+                      </div>
+
+                      <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-slate-800 font-bold text-lg">
+                              Recruitment Calculator
+                            </p>
+                            <p className="text-slate-500 text-sm mt-1">
+                              Mỗi operator trong recruitment pool được gắn tag riêng.
+                              Chọn tối đa 3 tag để lọc trực tiếp operator khớp.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedRecruitmentTags([])}
+                            className="rounded-lg"
+                          >
+                            Reset
+                          </Button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {RECRUITMENT_TAGS.map((tag) => {
+                            const active = selectedRecruitmentTags.includes(tag);
+
+                            return (
+                              <Button
+                                key={tag}
+                                type="button"
+                                size="sm"
+                                variant={active ? "default" : "outline"}
+                                onClick={() => handleToggleRecruitmentTag(tag)}
+                                className={
+                                  active
+                                    ? "bg-slate-800 hover:bg-slate-900 text-white rounded-lg"
+                                    : "rounded-lg border-slate-200 text-slate-600"
+                                }
+                              >
+                                {tag}
+                              </Button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="space-y-3">
+                          {selectedRecruitmentTags.length === 0 ? (
+                            <div className="bg-white rounded-xl border border-slate-100 p-4 text-sm text-slate-500">
+                              Chọn từ 1 đến 3 tag để hiện operator phù hợp.
+                            </div>
+                          ) : filteredRecruitmentOperators.length > 0 ? (
+                            <div className="bg-white rounded-xl border border-slate-100 p-4">
+                              <div className="flex items-center justify-between gap-3 mb-4">
+                                <p className="font-bold text-slate-800">
+                                  Kết quả khớp tag
+                                </p>
+                                <Badge
+                                  variant="outline"
+                                  className="bg-white border-slate-200 text-slate-600"
+                                >
+                                  {filteredRecruitmentOperators.length} operator
+                                </Badge>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {filteredRecruitmentOperators.map((operator) => (
+                                  <div
+                                    key={`recruitment-${operator.rarity}-${operator.name}`}
+                                    className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3"
+                                    title={`${operator.name} | ${operator.tags.join(", ")}`}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                        <img
+                                          src={getOperatorAvatarUrl(operator.name)}
+                                          alt={operator.name}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = "none";
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-bold text-slate-800 leading-tight">
+                                          {operator.name}
+                                        </p>
+                                        <div className="flex items-center gap-1 mt-1">
+                                          {Array.from({ length: operator.rarity }).map(
+                                            (_, index) => (
+                                              <Star
+                                                key={`${operator.name}-star-${index}`}
+                                                className="w-3 h-3 fill-amber-500 text-amber-500"
+                                              />
+                                            ),
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 mt-3">
+                                      {operator.tags.map((tag) => (
+                                        <span
+                                          key={`${operator.name}-${tag}`}
+                                          className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                                            selectedRecruitmentTags.includes(tag)
+                                              ? "bg-sky-100 text-sky-700"
+                                              : "bg-white text-slate-500 border border-slate-200"
+                                          }`}
+                                        >
+                                          {tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-white rounded-xl border border-slate-100 p-4 text-sm text-slate-500">
+                              Không có operator nào khớp bộ tag đang chọn.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent
                 value="characters"
                 className="mt-0 focus-visible:outline-none space-y-6"
               >
@@ -2309,6 +3043,10 @@ export function GameUserPage() {
                       </div>
                       Characters
                     </CardTitle>
+                    <CardDescription className="text-slate-500 text-base">
+                      Theo dõi danh sách operator, ngày ra mắt Global và lọc nhanh
+                      theo tên hoặc độ hiếm.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-6 space-y-4">
                     <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
@@ -2533,6 +3271,10 @@ export function GameUserPage() {
                       </div>
                       Banners
                     </CardTitle>
+                    <CardDescription className="text-slate-500 text-base">
+                      Xem banner đã ra và sắp ra, kèm character xuất hiện trong
+                      từng banner để tra cứu nhanh.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-6 space-y-4">
                     <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
@@ -2582,6 +3324,7 @@ export function GameUserPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {paginatedBanners.map((banner) => {
                             const isReleased = Boolean(banner.enStartDate);
+                            const bannerIsLimited = isBannerLimited(banner);
                             const visibleBannerOperators =
                               getNormalizedBannerOperatorNames(banner);
                             const estimatedReleaseDate =
@@ -2614,16 +3357,20 @@ export function GameUserPage() {
                                     <Badge
                                       variant="outline"
                                       className={
-                                        banner.limited
+                                        bannerIsLimited
                                           ? "bg-rose-100 text-rose-700 border-rose-200"
                                           : "bg-slate-50 border-slate-200 text-slate-500"
                                       }
                                     >
-                                      {banner.limited ? "Limited" : banner.category}
+                                      {bannerIsLimited ? "Limited" : banner.category}
                                     </Badge>
                                   </div>
 
                                   <div className="flex flex-col items-center text-center">
+                                    <p className="font-bold text-slate-800 leading-tight text-base min-h-[3rem] flex items-center justify-center">
+                                      {banner.name}
+                                    </p>
+
                                     <div className="w-full mb-3">
                                       {banner.bannerImageUrl ? (
                                         <div className="rounded-2xl overflow-hidden border border-sky-200 shadow-sm bg-slate-100">
@@ -2799,6 +3546,10 @@ export function GameUserPage() {
                       </div>
                       Tier List
                     </CardTitle>
+                    <CardDescription className="text-slate-500 text-base">
+                      Xem tier list mặc định, tạo tier list riêng và sắp xếp operator
+                      theo cách đánh giá của bạn.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-6 space-y-6">
                     <div className="flex flex-wrap gap-2">
@@ -3225,6 +3976,21 @@ export function GameUserPage() {
                 value="events"
                 className="mt-0 focus-visible:outline-none pb-28"
               >
+                <Card className="glass-card border-0 shadow-sm overflow-hidden mb-4">
+                  <div className="h-1.5 w-full bg-gradient-to-r from-cyan-400 to-blue-500" />
+                  <CardHeader className="pb-4 bg-white/30 border-b border-slate-100">
+                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
+                      <div className="p-2 bg-cyan-100 rounded-lg border border-cyan-200">
+                        <Gamepad2 className="w-6 h-6 text-cyan-600" />
+                      </div>
+                      Tin tức
+                    </CardTitle>
+                    <CardDescription className="text-slate-500 text-base">
+                      Theo dõi thông báo mới từ Yostar, nội dung event, banner,
+                      outfit và pack đang mở trong game.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
                 <div className="grid grid-cols-1 gap-4">
                   {newsData.map((news, idx) => {
                     return (
@@ -3284,7 +4050,8 @@ export function GameUserPage() {
                       Tra cứu lịch sử gacha
                     </CardTitle>
                     <CardDescription className="text-slate-500">
-                      Dán cookie lấy từ{" "}
+                      Kiểm tra lịch sử roll, lọc banner và theo dõi pity từ dữ
+                      liệu gacha của tài khoản. Dán cookie lấy từ{" "}
                       <a
                         href="https://account.yo-star.com/login"
                         target="_blank"

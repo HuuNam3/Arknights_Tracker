@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
+const FIRST_BANNER_YEAR = 2020;
 const MAIN_PAGE = "Headhunting/Banners";
-const YEAR_PAGE = `Headhunting/Banners/${CURRENT_YEAR}`;
-const PREVIOUS_YEAR_PAGE = `Headhunting/Banners/${CURRENT_YEAR - 1}`;
 const UPCOMING_PAGE = "Headhunting/Banners/Upcoming";
 const WIKI_PARSE_API = (page: string) =>
   `https://arknights.wiki.gg/api.php?action=parse&page=${encodeURIComponent(
@@ -19,8 +18,14 @@ type BannerRelease = {
   limited: boolean;
   name: string;
   operators: string[];
+  operatorRarities: Record<string, string>;
   releaseDate: string;
   releaseTs: number;
+};
+
+type BannerOperatorEntry = {
+  name: string;
+  rarity?: string;
 };
 
 const toAbsoluteWikiUrl = (value: string | null) => {
@@ -33,6 +38,12 @@ const toAbsoluteWikiUrl = (value: string | null) => {
 
 const stripHtml = (value: string) =>
   value
+    .replace(/&#(\d+);/g, (_, code: string) =>
+      String.fromCodePoint(Number.parseInt(code, 10)),
+    )
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) =>
+      String.fromCodePoint(Number.parseInt(code, 16)),
+    )
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&amp;/g, "&")
@@ -45,6 +56,18 @@ const stripHtml = (value: string) =>
 const normalizeDate = (value: string | null) =>
   value ? value.replace(/\//g, "-") : null;
 
+const extractRowCells = (row: string) => {
+  const match = row.match(
+    /<tr[^>]*>\s*<t[dh][^>]*>([\s\S]*?)<\/t[dh]>\s*<t[dh][^>]*>([\s\S]*?)<\/t[dh]>\s*<\/tr>/i,
+  );
+
+  if (!match) {
+    return [row];
+  }
+
+  return [match[1] ?? "", match[2] ?? ""];
+};
+
 const extractLabeledDate = (value: string, label: "CN" | "Global" | "Date") => {
   const match = value.match(
     new RegExp(`${label} date:\\s*(\\d{4}[/-]\\d{2}[/-]\\d{2})`, "i"),
@@ -52,14 +75,32 @@ const extractLabeledDate = (value: string, label: "CN" | "Global" | "Date") => {
   return normalizeDate(match?.[1] ?? null);
 };
 
-const extractBannerName = (row: string) => {
-  const titleMatches = [...row.matchAll(/title="([^"]+)"/gi)]
+const extractBannerName = (cellHtml: string) => {
+  const boldMatch = cellHtml.match(/<b[^>]*>([\s\S]*?)<\/b>/i);
+  if (boldMatch?.[1]) {
+    return stripHtml(boldMatch[1]);
+  }
+
+  const bannerImageMatch = cellHtml.match(
+    /(?:File:|Image:|\/)(?:CN|EN|Global)?\s*([A-Za-z0-9\s'".,&!:+\-()[\]]+?)\s+banner\.png/gi,
+  );
+  if (bannerImageMatch?.length) {
+    const lastMatch = bannerImageMatch[bannerImageMatch.length - 1];
+    const nameMatch = lastMatch.match(
+      /(?:File:|Image:|\/)(?:CN|EN|Global)?\s*([A-Za-z0-9\s'".,&!:+\-()[\]]+?)\s+banner\.png/i,
+    );
+
+    if (nameMatch?.[1]) {
+      return stripHtml(nameMatch[1]);
+    }
+  }
+
+  const titleMatches = [...cellHtml.matchAll(/title="([^"]+)"/gi)]
     .map((match) => stripHtml(match[1] ?? ""))
     .filter(
       (value) =>
         value &&
         !value.startsWith("File:") &&
-        !/^[456]★$/.test(value) &&
         !["Rate-Up Operators", "Headhunting"].includes(value),
     );
 
@@ -67,12 +108,7 @@ const extractBannerName = (row: string) => {
     return titleMatches[0];
   }
 
-  const boldMatch = row.match(/<b[^>]*>([\s\S]*?)<\/b>/i);
-  if (boldMatch?.[1]) {
-    return stripHtml(boldMatch[1]);
-  }
-
-  const text = stripHtml(row);
+  const text = stripHtml(cellHtml);
   return text.slice(0, 80);
 };
 
@@ -82,15 +118,30 @@ const GENERIC_TITLES = new Set([
   "File:",
 ]);
 
+const normalizeBannerComparison = (value: string) =>
+  stripHtml(value)
+    .toLowerCase()
+    .replace(/\[[^\]]+\]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
 const isValidOperatorCandidate = (value: string, bannerName: string) => {
   if (!value) return false;
-  if (value === bannerName) return false;
+  if (
+    value === bannerName ||
+    normalizeBannerComparison(value) === normalizeBannerComparison(bannerName)
+  ) {
+    return false;
+  }
   if (value.startsWith("File:")) return false;
   if (GENERIC_TITLES.has(value)) return false;
-  if (/^[3456]★$/.test(value)) return false;
   if (/^Headhunting\/Banners\//.test(value)) return false;
   if (/^(CN|Global|Date|Rate-Up Operators?)$/i.test(value)) return false;
-  if (/^(Limited|Standard|Kernel|Special|Joint Operation|Celebration)$/i.test(value)) {
+  if (
+    /^(Limited|Standard|Kernel|Special|Joint Operation|Celebration|Vision)$/i.test(
+      value,
+    )
+  ) {
     return false;
   }
   if (value.length <= 1) return false;
@@ -98,42 +149,58 @@ const isValidOperatorCandidate = (value: string, bannerName: string) => {
   return true;
 };
 
-const extractOperatorNames = (row: string) => {
-  const bannerName = extractBannerName(row);
-  const titleCandidates = [...row.matchAll(/title="([^"]+)"/gi)].map((match) =>
-    stripHtml(match[1] ?? ""),
-  );
-  const anchorCandidates = [...row.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)].map(
-    (match) => stripHtml(match[1] ?? ""),
-  );
-  const altCandidates = [...row.matchAll(/alt="([^"]+)"/gi)].map((match) =>
-    stripHtml(match[1] ?? ""),
-  );
+const extractOperatorNames = (cellHtml: string, bannerName: string) => {
+  const entries: BannerOperatorEntry[] = [];
+  const tooltipBlocks = [
+    ...cellHtml.matchAll(
+      /<div class="character-tooltip"([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/gi,
+    ),
+  ];
 
-  const unique: string[] = [];
-  for (const candidate of [
-    ...titleCandidates,
-    ...anchorCandidates,
-    ...altCandidates,
-  ]) {
+  for (const block of tooltipBlocks) {
+    const attributes = block[1] ?? "";
+    const nameMatch = attributes.match(/data-name="([^"]+)"/i);
+    const rarityMatch = attributes.match(/data-star="(\d+)"/i);
+    const candidate = stripHtml(nameMatch?.[1] ?? "");
+
     if (!isValidOperatorCandidate(candidate, bannerName)) continue;
-    if (!unique.includes(candidate)) {
-      unique.push(candidate);
-    }
+    if (entries.some((entry) => entry.name === candidate)) continue;
+
+    entries.push({
+      name: candidate,
+      rarity: rarityMatch?.[1],
+    });
   }
 
-  return unique.slice(0, 12);
+  if (entries.length > 0) {
+    return entries.slice(0, 12);
+  }
+
+  const fallbackCandidates = [...cellHtml.matchAll(/title="([^"]+)"|alt="([^"]+)"/gi)]
+    .map((match) => stripHtml(match[1] ?? match[2] ?? ""))
+    .filter((candidate) => isValidOperatorCandidate(candidate, bannerName));
+
+  for (const candidate of fallbackCandidates) {
+    if (entries.some((entry) => entry.name === candidate)) continue;
+    entries.push({ name: candidate });
+  }
+
+  return entries.slice(0, 12);
 };
 
-const extractBannerImageUrl = (row: string, bannerName: string) => {
-  const imageMatches = [...row.matchAll(/<img\b[^>]*src="([^"]+)"[^>]*(?:alt="([^"]*)")?[^>]*>/gi)];
+const extractBannerImageUrl = (cellHtml: string, bannerName: string) => {
+  const imageMatches = [
+    ...cellHtml.matchAll(
+      /<img\b[^>]*src="([^"]+)"[^>]*(?:alt="([^"]*)")?[^>]*>/gi,
+    ),
+  ];
 
   for (const match of imageMatches) {
     const src = toAbsoluteWikiUrl(match[1] ?? null);
     const alt = stripHtml(match[2] ?? "");
     if (!src) continue;
     if (/icon/i.test(src)) continue;
-    if (/\/[0-9]{2,3}px-/i.test(src)) continue;
+    if (/\/[0-9]{2,4}px-/i.test(src)) continue;
     if (alt && alt !== bannerName && !alt.includes(bannerName)) {
       continue;
     }
@@ -141,8 +208,10 @@ const extractBannerImageUrl = (row: string, bannerName: string) => {
     return src;
   }
 
-  const fileMatch = row.match(/href="([^"]*(?:File:|Special:Redirect\/file\/)[^"]+)"/i);
-  return toAbsoluteWikiUrl(fileMatch?.[1] ?? null);
+  const fileMatch = cellHtml.match(
+    /src="([^"]*banner\.png[^"]*)"|href="([^"]*(?:File:|Special:Redirect\/file\/)[^"]+)"/i,
+  );
+  return toAbsoluteWikiUrl(fileMatch?.[1] ?? fileMatch?.[2] ?? null);
 };
 
 const parseBannerRows = (html: string, fallbackCategory: string) => {
@@ -157,7 +226,10 @@ const parseBannerRows = (html: string, fallbackCategory: string) => {
 
     if (!cnStartDate && !enStartDate) continue;
 
-    const name = extractBannerName(row);
+    const cells = extractRowCells(row);
+    const bannerCell = cells[0] ?? row;
+    const operatorCell = cells[1] ?? row;
+    const name = extractBannerName(bannerCell);
     if (!name) continue;
 
     const releaseDate = cnStartDate ?? enStartDate;
@@ -166,22 +238,31 @@ const parseBannerRows = (html: string, fallbackCategory: string) => {
     const releaseTs = Date.parse(`${releaseDate}T00:00:00Z`);
     if (!Number.isFinite(releaseTs)) continue;
 
-    const categoryMatch = text.match(
-      /\b(Limited|Special|Standard|Kernel|Joint Operation|Celebration|Vision)\b/i,
-    );
+    const categoryMatch =
+      name.match(/\[(Limited|Festival|Carnival|Celebration|Vision)\]/i) ??
+      text.match(
+        /\b(Limited|Special|Standard|Kernel|Joint Operation|Celebration|Vision|Festival|Carnival)\b/i,
+      );
     const category = categoryMatch?.[1] ?? fallbackCategory;
+    const operatorEntries = extractOperatorNames(operatorCell, name);
 
     banners.push({
-      bannerImageUrl: extractBannerImageUrl(row, name),
+      bannerImageUrl: extractBannerImageUrl(bannerCell, name),
       category,
       cnStartDate,
       enStartDate,
       globalReleased: Boolean(enStartDate),
       limited:
+        /\[(Festival|Carnival|Celebration|Vision|Limited)\]/i.test(name) ||
         /limited/i.test(text) ||
-        /celebration|festival|carnival/i.test(category.toLowerCase()),
+        /celebration|festival|carnival|vision/i.test(category.toLowerCase()),
       name,
-      operators: extractOperatorNames(row),
+      operators: operatorEntries.map((entry) => entry.name),
+      operatorRarities: Object.fromEntries(
+        operatorEntries
+          .filter((entry) => entry.rarity)
+          .map((entry) => [entry.name, entry.rarity as string]),
+      ),
       releaseDate,
       releaseTs,
     });
@@ -213,6 +294,30 @@ const fetchParsedMarkup = async (page: string) => {
   }
 
   return payload.parse.text;
+};
+
+const fetchParsedMarkupSafe = async (page: string) => {
+  try {
+    const markup = await fetchParsedMarkup(page);
+    return { markup, page };
+  } catch (error) {
+    console.warn(`Skipping banner page ${page}`, error);
+    return null;
+  }
+};
+
+const getYearPageCandidates = () => {
+  const candidates: string[] = [];
+
+  for (let year = CURRENT_YEAR; year >= FIRST_BANNER_YEAR; year -= 1) {
+    candidates.push(`Headhunting/Banners/${year}`);
+
+    if (year !== CURRENT_YEAR) {
+      candidates.push(`Headhunting/Banners/Former-${year}`);
+    }
+  }
+
+  return [...new Set(candidates)];
 };
 
 const getBannerKey = (banner: BannerRelease) =>
@@ -250,6 +355,10 @@ const mergeBanners = (released: BannerRelease[], upcoming: BannerRelease[]) => {
         existing.operators.length >= banner.operators.length
           ? existing.operators
           : banner.operators,
+      operatorRarities: {
+        ...existing.operatorRarities,
+        ...banner.operatorRarities,
+      },
       releaseDate,
       releaseTs: Number.isFinite(releaseTs) ? releaseTs : existing.releaseTs,
     });
@@ -260,29 +369,32 @@ const mergeBanners = (released: BannerRelease[], upcoming: BannerRelease[]) => {
 
 export async function GET() {
   try {
-    const [mainMarkup, previousYearMarkup, yearMarkup, upcomingMarkup] = await Promise.all([
+    const [mainMarkup, upcomingMarkup, ...yearMarkupResults] = await Promise.all([
       fetchParsedMarkup(MAIN_PAGE),
-      fetchParsedMarkup(PREVIOUS_YEAR_PAGE),
-      fetchParsedMarkup(YEAR_PAGE),
-      fetchParsedMarkup(UPCOMING_PAGE),
+      fetchParsedMarkupSafe(UPCOMING_PAGE),
+      ...getYearPageCandidates().map((page) => fetchParsedMarkupSafe(page)),
     ]);
+    const yearMarkupEntries = yearMarkupResults.filter(
+      (entry): entry is { markup: string; page: string } => entry !== null,
+    );
 
     const currentBanners = parseBannerRows(mainMarkup, "Current");
-    const previousYearReleased = parseBannerRows(previousYearMarkup, "Banner");
-    const released = parseBannerRows(yearMarkup, "Banner");
-    const upcoming = parseBannerRows(upcomingMarkup, "Upcoming");
-    const data = mergeBanners(
-      [...currentBanners, ...previousYearReleased, ...released],
-      upcoming,
+    const released = yearMarkupEntries.flatMap(({ markup, page }) =>
+      parseBannerRows(markup, page.includes("Former-") ? "Former" : "Banner"),
     );
+    const upcoming = upcomingMarkup
+      ? parseBannerRows(upcomingMarkup.markup, "Upcoming")
+      : [];
+    const data = mergeBanners([...currentBanners, ...released], upcoming);
 
     return NextResponse.json({
       count: data.length,
       data,
       source: [
         `https://arknights.wiki.gg/wiki/${MAIN_PAGE}`,
-        `https://arknights.wiki.gg/wiki/${PREVIOUS_YEAR_PAGE}`,
-        `https://arknights.wiki.gg/wiki/${YEAR_PAGE}`,
+        ...yearMarkupEntries.map(
+          ({ page }) => `https://arknights.wiki.gg/wiki/${page}`,
+        ),
         `https://arknights.wiki.gg/wiki/${UPCOMING_PAGE}`,
       ],
     });
