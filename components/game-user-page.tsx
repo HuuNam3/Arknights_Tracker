@@ -27,7 +27,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertCircle,
-  Gift,
   Gamepad2,
   Zap,
   Crown,
@@ -35,10 +34,7 @@ import {
   Star,
   Trophy,
   Clock,
-  Link as LinkIcon,
-  Sparkles,
   ChevronRight,
-  Flame,
   Diamond,
   Search,
   Shield,
@@ -46,10 +42,8 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  Languages,
   ChevronLeft,
   History,
-  CalendarDays,
   Users,
   GalleryHorizontal,
   Plus,
@@ -84,115 +78,174 @@ const mockGachas: Record<
   },
 };
 
-// Mock reward codes
-const rewardCodesList = ["Chưa có code nào"];
+const NEWS_MONTHS: Record<string, string> = {
+  January: "01",
+  February: "02",
+  March: "03",
+  April: "04",
+  May: "05",
+  June: "06",
+  July: "07",
+  August: "08",
+  September: "09",
+  October: "10",
+  November: "11",
+  December: "12",
+};
 
-// Bá»™ tá»« Ä‘iá»ƒn Ä‘á»ƒ dá»‹ch HTML tá»« Yostar API
+const NEWS_PHRASE_REPLACEMENTS: Array<[string, string]> = [
+  ["UNLOCK REQUIREMENT:", "ĐIỀU KIỆN MỞ:"],
+  ["UPDATE TIME:", "THỜI GIAN CẬP NHẬT:"],
+  ["EVENT STAGE DURATION:", "THỜI GIAN MỞ MÀN SỰ KIỆN:"],
+  ["DURATION:", "THỜI GIAN:"],
+  ["DETAILS:", "CHI TIẾT:"],
+  ["REWARDS:", "PHẦN THƯỞNG:"],
+  ["CONTENTS:", "NỘI DUNG:"],
+  ["HOW TO OBTAIN:", "CÁCH NHẬN:"],
+  ["NOTE:", "LƯU Ý:"],
+  ["Note:", "LƯU Ý:"],
+  ["Phase 1", "Giai đoạn 1"],
+  ["Phase 2", "Giai đoạn 2"],
+  ["Phase 3", "Giai đoạn 3"],
+  ["Event Stages will open in 2 phases:", "Màn sự kiện sẽ mở theo 2 giai đoạn:"],
+  ["SPECIAL LOGIN EVENT OPEN", "SỰ KIỆN ĐĂNG NHẬP ĐẶC BIỆT MỞ"],
+  ["NEW OPERATORS NOW AVAILABLE", "OPERATOR MỚI ĐÃ CÓ MẶT"],
+  ["NEW ARRIVAL AT THE OUTFIT STORE", "TRANG PHỤC MỚI TẠI CỬA HÀNG OUTFIT"],
+  ["NEW ARRIVALS AT THE OUTFIT STORE", "TRANG PHỤC MỚI TẠI CỬA HÀNG OUTFIT"],
+  ["RE-EDITION OUTFITS AT THE OUTFIT STORE", "TRANG PHỤC TÁI PHÁT HÀNH TẠI CỬA HÀNG OUTFIT"],
+  ["LIMITED-TIME PACKS AVAILABLE", "CÁC GÓI GIỚI HẠN ĐANG MỞ BÁN"],
+  ["RE-EDITION FURNITURE SET", "BỘ NỘI THẤT TÁI PHÁT HÀNH"],
+  ["NEW FURNITURE SET", "BỘ NỘI THẤT MỚI"],
+  ["NEW REDEEMABLE AVAILABLE IN", "VẬT PHẨM ĐỔI MỚI TRONG"],
+  ["at the Outfit Store", "tại Cửa hàng Outfit"],
+  ["from the Store", "từ cửa hàng"],
+  ["at the Store", "trong cửa hàng"],
+  ["During the event,", "Trong thời gian sự kiện,"],
+  ["After this event ends,", "Sau khi sự kiện kết thúc,"],
+  ["After the event ends,", "Sau khi sự kiện kết thúc,"],
+  ["After this rerun event ends,", "Sau khi đợt rerun này kết thúc,"],
+  ["For this rerun event,", "Trong đợt rerun này,"],
+  ["This rerun event is a lightweight rerun;", "Đây là một đợt rerun dạng nhẹ;"],
+  ["During this event,", "Trong thời gian sự kiện,"],
+  ["players can obtain", "người chơi có thể nhận"],
+  ["players can complete", "người chơi có thể hoàn thành"],
+  ["players can claim", "người chơi có thể nhận"],
+  ["you can collect", "bạn có thể thu thập"],
+  ["by participating in the event", "khi tham gia sự kiện"],
+  ["by clearing event stages", "bằng cách vượt các màn sự kiện"],
+  ["clearing event stages", "vượt các màn sự kiện"],
+  ["completing event missions", "hoàn thành nhiệm vụ sự kiện"],
+  ["and completing", "và hoàn thành"],
+  ["to gain rewards", "để nhận thưởng"],
+  ["to redeem items for rewards", "để đổi vật phẩm nhận thưởng"],
+  ["can be used to redeem items from", "có thể được dùng để đổi vật phẩm từ"],
+  ["redeeming from Event Store", "đổi thưởng trong Cửa hàng sự kiện"],
+  ["redeeming from", "đổi thưởng từ"],
+  ["will be open for a limited time.", "sẽ mở trong thời gian giới hạn."],
+  ["will be available again during the event.", "sẽ mở lại trong thời gian sự kiện."],
+  ["will be available at the Outfit Store:", "sẽ được mở bán tại Cửa hàng Outfit:"],
+  ["will be available at the Outfit Store, including:", "sẽ được mở bán tại Cửa hàng Outfit, gồm:"],
+  ["will be available from the Store for a limited time.", "sẽ được bán giới hạn từ cửa hàng."],
+  ["will be available at the Store for a limited time.", "sẽ được bán giới hạn trong cửa hàng."],
+  ["The following new Outfit", "Outfit mới sau"],
+  ["The following new Outfits", "Các Outfit mới sau"],
+  ["The following Re-edition Outfit", "Outfit tái phát hành sau"],
+  ["The following Re-edition Outfits", "Các Outfit tái phát hành sau"],
+  ["the following packs", "các gói sau"],
+  ["the following Operators", "các Operator sau"],
+  ["the following new Outfits", "các Outfit mới sau"],
+  ["the following Re-edition Outfits", "các Outfit tái phát hành sau"],
+  ["the following new Outfit", "Outfit mới sau"],
+  ["the following Re-edition Outfit", "Outfit tái phát hành sau"],
+  ["The following Operators will be added to the game:", "Các Operator sau sẽ được thêm vào game:"],
+  ["The profile theme can be viewed and used in Profile.", "Profile theme có thể được xem và sử dụng trong Profile."],
+  ["Please refer to the in-game info for the expiration time of", "Vui lòng xem thông tin trong game để biết thời gian hết hạn của"],
+  ["the event stories cannot be reviewed in [Public Affairs].", "cốt truyện sự kiện chưa thể xem lại trong [Public Affairs]."],
+  ["this event will be included in [Public Affairs].", "sự kiện này sẽ được thêm vào [Public Affairs]."],
+  ["the Limited-time Headhunting,", "banner Headhunting giới hạn"],
+  ["opens and the following Operators will appear at a higher rate:", "mở và các Operator sau sẽ có tỉ lệ xuất hiện cao hơn:"],
+  ["This is a [Standard Headhunting].", "Đây là [Standard Headhunting]."],
+  ["If you make 150 headhunting attempts without receiving the current rate-up 6-star Operator, the next 6-star operator received is guaranteed to be the current rate-up 6-star Operator.", "Nếu bạn thực hiện 150 lượt headhunt mà chưa nhận được Operator 6 sao rate-up hiện tại, Operator 6 sao tiếp theo chắc chắn sẽ là Operator 6 sao rate-up hiện tại."],
+  ["is currently ONLY available from the", "hiện CHỈ có thể nhận từ"],
+  ["and is NOT available in", "và KHÔNG có trong"],
+  ["will become available in other", "sẽ xuất hiện trong các"],
+  ["will gain more trust in the", "sẽ nhận thêm trust trong"],
+  ["For this rerun event, some of the engraved medals in the corresponding Engraved Medal Set will have their acquisition conditions adjusted.", "Trong đợt rerun này, một số huy chương khắc trong Engraved Medal Set tương ứng sẽ được điều chỉnh điều kiện nhận."],
+  ["Players who meet the updated conditions will be able to obtain the event's engraved medals.", "Người chơi đáp ứng điều kiện mới sẽ có thể nhận các huy chương khắc của sự kiện."],
+  ["Due to these adjustments, players who previously participated in the event and already meet the new acquisition conditions will receive the corresponding engraved medals immediately upon the update.", "Do các điều chỉnh này, người chơi đã từng tham gia sự kiện và đã đáp ứng điều kiện mới sẽ nhận ngay các huy chương tương ứng khi bản cập nhật được áp dụng."],
+  ["the engraved medals from the event's Engraved Medal Set cannot be obtained again through [Score] or any other channels.", "các huy chương trong Engraved Medal Set của sự kiện sẽ không thể nhận lại qua [Score] hoặc bất kỳ kênh nào khác."],
+  ["event stages will inherit the player's previous event stage progress and first-time drop progress.", "các màn sự kiện sẽ kế thừa tiến độ màn và tiến độ first-time drop trước đó của người chơi."],
+  ["Some non-repeatable event rewards during this rerun can be converted into [Intelligence Certificate] at a corresponding ratio when obtained again.", "Một số phần thưởng sự kiện không thể nhận lặp lại trong đợt rerun này sẽ được chuyển thành [Intelligence Certificate] theo tỉ lệ tương ứng nếu nhận lại."],
+  ["The conversion rates can be found in the event's Intelligence Certificate Conversion Rules.", "Tỉ lệ chuyển đổi có thể xem trong quy tắc chuyển đổi Intelligence Certificate của sự kiện."],
+  ["The [Intelligence Certificate] shop will restock additional quantities of existing items and add new items when the event starts.", "Cửa hàng [Intelligence Certificate] sẽ bổ sung thêm số lượng cho vật phẩm hiện có và thêm vật phẩm mới khi sự kiện bắt đầu."],
+  ["After this event ends, the event stages will be permanently added to [Score]", "Sau khi sự kiện kết thúc, các màn sự kiện sẽ được thêm vĩnh viễn vào [Score]"],
+  ["cannot be used to redeem the above outfits.", "không thể dùng để đổi các outfit ở trên."],
+  ["Please stay tuned for more information!", "Vui lòng chờ thêm thông tin chi tiết!"],
+  ["Brand new set of themed furniture,", "Bộ nội thất chủ đề mới,"],
+];
+
+const NEWS_TERM_REPLACEMENTS: Array<[string, string]> = [
+  ["[Maintenance Checklist]", "[Danh sách bảo trì]"],
+  ["[Stratosphere Estate Agency]", "[Cơ quan bất động sản tầng bình lưu]"],
+  ["[Commissione di Fuochi d'Artificio]", "[Ủy ban pháo hoa]"],
+  ["[Programma della Parata]", "[Chương trình diễu hành]"],
+  ["[Fiera delle Meraviglie Notturne]", "[Hội chợ kỳ thú ban đêm]"],
+  ["Clear Main Storyline", "Hoàn thành Main Story"],
+  ["event rewards", "phần thưởng sự kiện"],
+  ["event stages", "màn sự kiện"],
+  ["event stage", "màn sự kiện"],
+  ["event missions", "nhiệm vụ sự kiện"],
+  ["missions", "nhiệm vụ"],
+  ["and more.", "và nhiều hơn nữa."],
+  ["etc.", "v.v."],
+  [" and ", " và "],
+  ["Daily Commissions", "Nhiệm vụ hằng ngày"],
+  ["Event Store", "Cửa hàng sự kiện"],
+  ["Outfit Store", "Cửa hàng Outfit"],
+  ["Headhunting Permits", "Vé Headhunting"],
+  ["Module Materials", "Nguyên liệu Module"],
+  ["Elite Materials", "Nguyên liệu Elite"],
+  ["Battle Records", "Battle Record"],
+  ["Furniture Part", "Phụ tùng nội thất"],
+  ["Profile Theme", "Profile Theme"],
+  ["profile theme", "profile theme"],
+  ["Emergency Sanity Concentrate", "Emergency Sanity Concentrate"],
+  ["Intelligence Certificate", "Intelligence Certificate"],
+  ["Standard Headhunting", "Standard Headhunting"],
+  ["Kernel Headhunting", "Kernel Headhunting"],
+  ["Trust gain", "Trust nhận được"],
+  ["rerun event", "đợt rerun"],
+  ["lightweight rerun", "rerun dạng nhẹ"],
+  ["provides random materials", "cho nguyên liệu ngẫu nhiên"],
+];
+
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const translateNewsDates = (value: string) =>
+  value.replace(
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})/g,
+    (_, month: string, day: string, year: string) =>
+      `${day.padStart(2, "0")}/${NEWS_MONTHS[month]}/${year}`,
+  );
+
+const applyTranslationMap = (
+  value: string,
+  replacements: Array<[string, string]>,
+) =>
+  replacements
+    .sort((left, right) => right[0].length - left[0].length)
+    .reduce((translated, [source, target]) => {
+      const regex = new RegExp(escapeRegExp(source), "gi");
+      return translated.replace(regex, target);
+    }, value);
+
 const translateGameTerms = (html: string) => {
   if (!html) return "";
-  let translated = html;
 
-  const dict: Record<string, string> = {
-    "DURATION:": "THá»œI GIAN:",
-    "Event Period:": "Thá»i gian sá»± kiá»‡n:",
-    "UNLOCK REQUIREMENT:": "ÄIá»€U KIá»†N Má»ž KHÃ“A:",
-    "Eligibility:": "Äiá»u kiá»‡n tham gia:",
-    "DETAILS:": "CHI TIáº¾T:",
-    "Event Details:": "Chi tiáº¿t sá»± kiá»‡n:",
-    "REWARDS:": "PHáº¦N THÆ¯á»žNG:",
-    "NOTE:": "LÆ¯U Ã:",
-    Notice: "ThÃ´ng bÃ¡o",
-    "CONTENTS:": "Ná»˜I DUNG:",
-    "Dear Doctor": "Tiáº¿n sÄ© thÃ¢n máº¿n",
-    Maintenance: "Báº£o trÃ¬",
-    Update: "Cáº­p nháº­t",
-    "STRONGHOLD PROTOCOL: ALLIANCE OPEN": "GIAO THá»¨C Cá»¨ ÄIá»‚M: Má»ž LIÃŠN MINH",
-    "Clear Main Storyline": "HoÃ n thÃ nh cá»‘t truyá»‡n chÃ­nh",
-    "ORIENTEERING HEADHUNTING OPEN FOR A LIMITED TIME":
-      "TÃŒM KIáº¾M Äá»ŠNH HÆ¯á»šNG Má»ž CÃ“ GIá»šI Háº N",
-    "LIMITED-TIME PACKS AVAILABLE": "GÃ“I QUÃ€ GIá»šI Háº N THá»œI GIAN",
-    "Limited-Time": "Giá»›i háº¡n thá»i gian",
-    "Login Event": "Sá»± kiá»‡n ÄÄƒng nháº­p",
-    "New Operator": "NhÃ¢n viÃªn má»›i",
-    Outfit: "Trang phá»¥c",
-    Furniture: "Ná»™i tháº¥t",
-    "Module Materials": "Váº­t liá»‡u Module",
-    "Elite Materials": "Váº­t liá»‡u Tinh Anh",
-    "Battle Records": "Tháº» Kinh Nghiá»‡m",
-    LMD: "Long MÃ´n Tá»‡ (LMD)",
-    "During the event, players can obtain event rewards by leveling up":
-      "Trong thá»i gian sá»± kiá»‡n, ngÆ°á»i chÆ¡i cÃ³ thá»ƒ nháº­n pháº§n thÆ°á»Ÿng báº±ng cÃ¡ch thÄƒng cáº¥p",
-    "event stages": "mÃ n chÆ¡i sá»± kiá»‡n",
-    "Standard Headhunting": "TÃ¬m kiáº¿m tiÃªu chuáº©n",
-    Headhunting: "TÃ¬m kiáº¿m",
-    Operators: "NhÃ¢n viÃªn (Operator)",
-    "rate-up": "tÄƒng tá»‰ lá»‡",
-    "Please stay tuned for more details.":
-      "Vui lÃ²ng theo dÃµi Ä‘á»ƒ biáº¿t thÃªm chi tiáº¿t.",
-    "Please stay tuned for more information!":
-      "Vui lÃ²ng theo dÃµi Ä‘á»ƒ biáº¿t thÃªm thÃ´ng tin!",
-    "Module Data Block": "Khá»‘i Dá»¯ Liá»‡u Module",
-    "Data Supplement Instrument": "Thiáº¿t Bá»‹ Bá»• Sung Dá»¯ Liá»‡u",
-    "Data Supplement Stick": "Thanh Bá»• Sung Dá»¯ Liá»‡u",
-    "All possible Operators:": "Táº¥t cáº£ cÃ¡c NhÃ¢n ViÃªn cÃ³ thá»ƒ xuáº¥t hiá»‡n:",
-    "Event Page:": "Trang Sá»± kiá»‡n:",
-    "Event Schedule (UTC-7):": "Lá»‹ch trÃ¬nh Sá»± kiá»‡n (UTC-7):",
-    "Submission:": "Ná»™p bÃ i:",
-    "Staff Review:": "NhÃ¢n viÃªn xÃ©t duyá»‡t:",
-    "Voting:": "BÃ¬nh chá»n:",
-    "Results Announcement:": "CÃ´ng bá»‘ káº¿t quáº£:",
-    "How To Submit:": "CÃ¡ch thá»©c Ná»™p bÃ i:",
-    "The Gameplay Category:": "Háº¡ng má»¥c Gameplay:",
-    "The Fan Creation Category:": "Háº¡ng má»¥c Fan sÃ¡ng táº¡o:",
-    "How to Vote:": "CÃ¡ch thá»©c BÃ¬nh chá»n:",
-    "List of Awards": "Danh sÃ¡ch Giáº£i thÆ°á»Ÿng",
-    "Top Prize": "Giáº£i Äáº·c biá»‡t",
-    "Second-Tier Prize": "Giáº£i NhÃ¬",
-    "Third-Tier Prize": "Giáº£i Ba",
-    "New Spark Award": "Giáº£i Tia Lá»­a Má»›i",
-    "Additional Rules:": "Quy Ä‘á»‹nh Bá»• sung:",
-    "SIDESTORY: RETRACING OUR STEPS OPEN": "NGOáº I TRUYá»†N: Láº¦N THEO Dáº¤U CHÃ‚N Má»ž",
-    "\\[THANK-YOU CELEBRATION\\]": "[Lá»„ Ká»¶ NIá»†M TRI Ã‚N]",
-    "Phase 1": "Giai Ä‘oáº¡n 1",
-    "Phase 2": "Giai Ä‘oáº¡n 2",
-    "Phase 3": "Giai Ä‘oáº¡n 3",
-    "Open Stages:": "MÃ n chÆ¡i má»Ÿ:",
-    "\\[Oracular Riddles\\]": "[CÃ¢u Ä‘á»‘ TiÃªn tri]",
-    "\\[Observatory Support Division\\]": "[Bá»™ pháº­n Há»— trá»£ ÄÃ i thiÃªn vÄƒn]",
-    "LIMITED HEADHUNTING OPEN": "Má»ž TÃŒM KIáº¾M GIá»šI Háº N",
-    "SPECIAL LOGIN EVENT OPEN": "Má»ž Sá»° KIá»†N ÄÄ‚NG NHáº¬P Äáº¶C BIá»†T",
-    "DAILY FREE ROLL": "QUAY MIá»„N PHÃ Má»–I NGÃ€Y",
-    "SPECIAL RECRUITMENT OPEN": "Má»ž TUYá»‚N Dá»¤NG Äáº¶C BIá»†T",
-    "LIMITED SIGN-IN EVENT OPEN": "Má»ž Sá»° KIá»†N ÄÄ‚NG NHáº¬P GIá»šI Háº N",
-    "WISHING WALL OPEN": "Má»ž Bá»¨C TÆ¯á»œNG Cáº¦U NGUYá»†N",
-    "OPERATORS UPDATE IN PURCHASE CERTIFICATES STORE":
-      "Cáº¬P NHáº¬T NHÃ‚N VIÃŠN Cá»¬A HÃ€NG CHá»¨NG CHá»ˆ",
-    "NEW OPERATORS NOW AVAILABLE": "NHÃ‚N VIÃŠN Má»šI ÄÃƒ CÃ“ Máº¶T",
-    "EPOQUE COLLECTION & TEST COLLECTION NEW ARRIVALS AT THE OUTFIT STORE":
-      "TRANG PHá»¤C Má»šI Táº I Cá»¬A HÃ€NG TRANG PHá»¤C",
-    "RE-EDITION OUTFITS AT THE OUTFIT STORE":
-      "TRANG PHá»¤C TÃI Báº¢N Táº I Cá»¬A HÃ€NG TRANG PHá»¤C",
-    "RHODES FASHION REVIEW OPEN": "Má»ž ÄÃNH GIÃ THá»œI TRANG RHODES",
-    "OPTIMIZATION TO SANITY POTION USAGE": "Tá»I Æ¯U HÃ“A Sá»¬ Dá»¤NG THUá»C LÃ TRÃ",
-    "OPTIMIZATIONS TO CLUES & SUPPORT FUNCTIONS":
-      "Tá»I Æ¯U HÃ“A TÃNH NÄ‚NG MANH Má»I & Há»– TRá»¢",
-    "LIMITED-TIME CELEBRATION PACKS AVAILABLE":
-      "GÃ“I Ká»¶ NIá»†M GIá»šI Háº N THá»œI GIAN",
-    "NEW FURNITURE SET": "Bá»˜ Ná»˜I THáº¤T Má»šI",
-    "SPECIALIZED MODULES UPDATE": "Cáº¬P NHáº¬T MODULE CHUYÃŠN Dá»¤NG",
-    "RECRUIT OPERATORS UPDATE": "Cáº¬P NHáº¬T NHÃ‚N VIÃŠN TUYá»‚N Dá»¤NG",
-    "THEMED BACKGROUND RERUN": "Má»ž Láº I HÃŒNH Ná»€N THEO CHá»¦ Äá»€",
-    "KERNEL LOCATING OPEN": "Má»ž KERNEL LOCATING",
-    "SIGN-IN RESUPPLIES OPEN": "Má»ž TIáº¾P Táº¾ ÄÄ‚NG NHáº¬P",
-    "HOW TO OBTAIN:": "CÃCH NHáº¬N:",
-    "UPDATE TIME:": "THá»œI GIAN Cáº¬P NHáº¬T:",
-  };
-
-  for (const [eng, vie] of Object.entries(dict)) {
-    // Thay tháº¿ táº¥t cáº£ cá»¥m tá»« (khÃ´ng phÃ¢n biá»‡t chá»¯ hoa chá»¯ thÆ°á»ng)
-    const regex = new RegExp(eng, "gi");
-    translated = translated.replace(regex, vie);
-  }
+  let translated = translateNewsDates(html);
+  translated = applyTranslationMap(translated, NEWS_PHRASE_REPLACEMENTS);
+  translated = applyTranslationMap(translated, NEWS_TERM_REPLACEMENTS);
 
   return translated;
 };
@@ -406,6 +459,150 @@ type SavedTierList = {
   id: string;
   name: string;
   tiers: string[];
+};
+
+const DEFAULT_SAVED_TIER_LISTS: SavedTierList[] = [
+  {
+    assignments: {
+      "Exusiai the New Covenant": "OP+",
+      Haruka: "OP+",
+      "Wiš'adel": "OP+",
+      Exusiai: "S",
+      Ash: "A+",
+      Archetto: "A+",
+      "Pozëmka": "S-",
+      Schwarz: "A+",
+      Lemuen: "S+",
+      Fartooth: "A",
+      Fiammetta: "S-",
+      W: "A+",
+      "Ch'en the Dawnstreak": "",
+      "Ch'en the Holungday": "OP-",
+      Rosa: "S",
+      Typhon: "S+",
+      Rosmontis: "A",
+      Ray: "A+",
+      Narantuya: "S",
+      Logos: "OP",
+      Eyjafjalla: "S",
+      Ceobe: "S",
+      "Ho'olheyak": "A",
+      Dusk: "A+",
+      Mostima: "S-",
+      Marcille: "A+",
+      Passenger: "S-",
+      "Astgenne the Lightchaser": "A-",
+      Ebenholz: "S-",
+      Ifrit: "S",
+      Lin: "S",
+      Carnelian: "A",
+      Goldenglow: "S+",
+      "Lappland the Decadenza": "S-",
+      "Hoshiguma the Breacher": "OP",
+      "Blaze the Igniting Spark": "S",
+      Nymph: "S+",
+      Necrass: "S+",
+      SilverAsh: "S",
+      Thorns: "S",
+      Qiubai: "S",
+      Pallas: "A",
+      "Ch'en": "A+",
+      Irene: "S-",
+      Degenbrecher: "OP",
+      Blaze: "S-",
+      "Gavial the Invincible": "S",
+      Lessing: "A",
+      Skadi: "A+",
+      "Nearl the Radiant Knight": "S",
+      Mountain: "S",
+      Chongyue: "S",
+      "Zuo Le": "S+",
+      Hellagur: "A",
+      Surtr: "S+",
+      "Vina Victoria": "S-",
+      Viviana: "S",
+      "Executor the Ex Foedere": "S+",
+      Entelechia: "S+",
+      "Młynar": "OP",
+      "Leizi the Thunderbringer": "OP",
+      Ulpianus: "S+",
+      Hoederer: "S-",
+      Pepe: "S-",
+      Hoshiguma: "S-",
+      Nian: "S-",
+      "Sankta Miksaparato": "A+",
+      "Jessica the Liberated": "S-",
+      Mudrock: "S",
+      Penance: "S",
+      Eunectes: "A+",
+      Saria: "S",
+      Shu: "OP-",
+      Blemishine: "A+",
+      Horn: "S",
+      Yu: "S-",
+      Siege: "A",
+      Vulpisfoglia: "S-",
+      Saga: "S-",
+      Flametail: "S-",
+      Saileach: "S",
+      Bagpipe: "S+",
+      Muelsyse: "S",
+      Vigil: "A-",
+      Ines: "OP",
+      Shining: "A+",
+      Nightingale: "S",
+      Lumen: "S-",
+      "Reed the Flame Shadow": "S+",
+      Mon3tr: "OP-",
+      Suzuran: "S+",
+      "Skadi the Corrupting Heart": "S",
+      "Civilight Eterna": "S",
+      Gnosis: "S",
+      "Silence the Paradigmatic": "A+",
+      Magallan: "A+",
+      Ling: "A+",
+      "Kal'tsit": "S",
+      Tragodia: "OP",
+      Virtuosa: "S+",
+      Phantom: "A+",
+      "Texas the Omertosa": "OP-",
+      "Kirin R Yato": "OP-",
+      Crownslayer: "A",
+      "Swire the Elegant Wit": "A+",
+      Lee: "A+",
+      Ela: "OP-",
+      Dorothy: "S-",
+      Ascalon: "S+",
+      Mizuki: "A+",
+      Gladiia: "S-",
+      Weedy: "S",
+      "Specter the Unchained": "S",
+      "Thorns the Lodestar": "A+",
+      Aak: "A+",
+      Angelina: "A+",
+      "Eyjafjalla the Hvít Aska": "OP-",
+      "Pramanix the Prerita": "OP",
+      "SilverAsh the Reignfrost": "OP",
+      Nasti: "S",
+      Mantra: "S",
+      "Togawa Sakiko": "OP",
+    },
+    createdAt: 1779985894777,
+    id: "1779985894777",
+    name: "2026 only 6s",
+    tiers: ["OP+", "OP", "OP-", "S+", "S", "S-", "A+", "A", "A-"],
+  },
+];
+
+const mergeDefaultTierLists = (tierLists: SavedTierList[]) => {
+  const existingNames = new Set(
+    tierLists.map((tierList) => tierList.name.trim().toLowerCase()),
+  );
+  const missingDefaults = DEFAULT_SAVED_TIER_LISTS.filter(
+    (tierList) => !existingNames.has(tierList.name.trim().toLowerCase()),
+  );
+
+  return [...missingDefaults, ...tierLists];
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -796,11 +993,7 @@ export function GameUserPage() {
   const [isNewsLoading, setIsNewsLoading] = useState(false);
   const [newsPage, setNewsPage] = useState(1);
   const [newsTotalPages, setNewsTotalPages] = useState(1);
-  const [isTranslated, setIsTranslated] = useState(false);
   const [activeTab, setActiveTab] = useState("characters");
-  const [rewardCode, setRewardCode] = useState("");
-  const [rewardMessage, setRewardMessage] = useState("");
-  const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [cookieToken, setCookieToken] = useState("");
   const [gachaData, setGachaData] = useState<any[] | null>(null);
   const [gachaAllData, setGachaAllData] = useState<any[] | null>(null);
@@ -821,8 +1014,12 @@ export function GameUserPage() {
   const [tierOrder, setTierOrder] = useState<string[]>([...DEFAULT_TIER_ORDER]);
   const [tierListName, setTierListName] = useState("");
   const [newTierName, setNewTierName] = useState("");
-  const [savedTierLists, setSavedTierLists] = useState<SavedTierList[]>([]);
-  const [selectedTierListId, setSelectedTierListId] = useState("");
+  const [savedTierLists, setSavedTierLists] = useState<SavedTierList[]>(
+    DEFAULT_SAVED_TIER_LISTS,
+  );
+  const [selectedTierListId, setSelectedTierListId] = useState(
+    DEFAULT_SAVED_TIER_LISTS[0]?.id ?? "",
+  );
   const [tierSearch, setTierSearch] = useState("");
   const [tierStarFilter, setTierStarFilter] = useState("all");
   const [tierPoolPage, setTierPoolPage] = useState(1);
@@ -966,11 +1163,7 @@ export function GameUserPage() {
 
       if (!keyword) return starMatches;
 
-      return (
-        starMatches &&
-        (operator.name.toLowerCase().includes(keyword) ||
-          operator.event.toLowerCase().includes(keyword))
-      );
+      return starMatches && operator.name.toLowerCase().includes(keyword);
     });
   const bannerReleaseLagDays = getMedianLagDays(
     bannerData,
@@ -1068,9 +1261,8 @@ export function GameUserPage() {
       const keyword = bannerSearch.trim().toLowerCase();
       if (!keyword) return true;
 
-      return (
-        banner.name.toLowerCase().includes(keyword) ||
-        banner.category.toLowerCase().includes(keyword)
+      return getNormalizedBannerOperatorNames(banner).some((operatorName) =>
+        operatorName.toLowerCase().includes(keyword),
       );
     });
   const activeGachaSource = showGachaSixStarOnly
@@ -1525,13 +1717,17 @@ export function GameUserPage() {
               .map((tierList) => hydrateSavedTierList(tierList))
               .filter((tierList): tierList is SavedTierList => tierList !== null)
           : [];
-        setSavedTierLists(hydratedTierLists);
-        if (hydratedTierLists[0]) {
-          setSelectedTierListId(hydratedTierLists[0].id);
+        const mergedTierLists = mergeDefaultTierLists(hydratedTierLists);
+        setSavedTierLists(mergedTierLists);
+        if (mergedTierLists[0]) {
+          setSelectedTierListId(mergedTierLists[0].id);
         }
       } catch (error) {
         console.error(error);
       }
+    } else if (DEFAULT_SAVED_TIER_LISTS[0]) {
+      setSavedTierLists(DEFAULT_SAVED_TIER_LISTS);
+      setSelectedTierListId(DEFAULT_SAVED_TIER_LISTS[0].id);
     }
     if (!savedUid) return;
 
@@ -1574,30 +1770,10 @@ export function GameUserPage() {
     await lookupUserInfo(uid, { showLoading: true });
   };
 
-  const handleExchangeReward = () => {
-    if (!userInfo) {
-      setRewardMessage("âŒ Vui lÃ²ng nháº­p UID trÆ°á»›c");
-      return;
-    }
-    if (!rewardCode.trim()) {
-      setRewardMessage("âŒ Vui lÃ²ng nháº­p mÃ£ thÆ°á»Ÿng");
-      return;
-    }
-    setRewardMessage(
-      `âœ… MÃ£ thÆ°á»Ÿng "${rewardCode}" Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng cho tÃ i khoáº£n ${userInfo.name}!`,
-    );
-    setRewardCode("");
-    setTimeout(() => setRewardMessage(""), 3000);
-  };
-
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleSearch();
     }
-  };
-
-  const handleOpenRedeemLink = () => {
-    window.open("https://arknights.global/gift", "_blank");
   };
 
   const handleAddTier = () => {
@@ -1871,7 +2047,7 @@ export function GameUserPage() {
           <div className="flex items-center justify-center gap-4 mb-4">
             <Gamepad2 className="w-12 h-12 text-cyan-500 animate-pulse-glow animate-float" />
             <h1 className="text-5xl md:text-7xl font-black gradient-text tracking-tight">
-              ArkViewer
+              Arknights Tracker
             </h1>
             <Crown
               className="w-12 h-12 text-purple-500 animate-pulse-glow animate-float"
@@ -2082,7 +2258,7 @@ export function GameUserPage() {
               onValueChange={setActiveTab}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 bg-white/70 backdrop-blur-xl border border-slate-200/80 p-1.5 rounded-2xl shadow-sm mb-6 h-auto gap-1.5">
+              <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-white/70 backdrop-blur-xl border border-slate-200/80 p-1.5 rounded-2xl shadow-sm mb-6 h-auto gap-1.5">
                 <TabsTrigger
                   value="characters"
                   className="py-3 text-slate-500 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:border-emerald-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
@@ -2110,13 +2286,6 @@ export function GameUserPage() {
                 >
                   <Gamepad2 className="w-5 h-5 mr-2" />
                   Tin tức
-                </TabsTrigger>
-                <TabsTrigger
-                  value="rewards"
-                  className="py-3 text-slate-500 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:border-purple-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                >
-                  <Gift className="w-5 h-5 mr-2" />
-                  Đổi quà
                 </TabsTrigger>
                 <TabsTrigger
                   value="gacha"
@@ -2149,7 +2318,7 @@ export function GameUserPage() {
                             <Search className="h-5 w-5 text-slate-400" />
                           </div>
                           <Input
-                            placeholder="Tìm theo tên hoặc event"
+                            placeholder="Tìm theo tên"
                             value={operatorSearch}
                             onChange={(e) => setOperatorSearch(e.target.value)}
                             className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-emerald-400 focus:ring-emerald-400/20 pl-10 h-12 text-base rounded-xl"
@@ -2175,13 +2344,6 @@ export function GameUserPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 text-sm text-slate-500 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className="bg-white border-slate-200 text-slate-600"
-                        >
-                          <CalendarDays className="w-3.5 h-3.5 mr-1.5" />
-                          Chưa ra đứng trước
-                        </Badge>
                         <Badge
                           variant="outline"
                           className="bg-white border-slate-200 text-slate-600"
@@ -2213,7 +2375,7 @@ export function GameUserPage() {
                       </Alert>
                     ) : (
                       <>
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                           {paginatedOperators.map((operator) => {
                             const rarity = getOperatorRarityValue(operator) ?? 0;
                             const isSixStar = rarity === 6;
@@ -2379,20 +2541,13 @@ export function GameUserPage() {
                           <Search className="h-5 w-5 text-slate-400" />
                         </div>
                         <Input
-                          placeholder="Tìm theo tên banner hoặc loại"
+                          placeholder="Tìm character có trong banner"
                           value={bannerSearch}
                           onChange={(e) => setBannerSearch(e.target.value)}
                           className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-sky-400 focus:ring-sky-400/20 pl-10 h-12 text-base rounded-xl"
                         />
                       </div>
                       <div className="flex items-center gap-3 text-sm text-slate-500 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className="bg-white border-slate-200 text-slate-600"
-                        >
-                          <CalendarDays className="w-3.5 h-3.5 mr-1.5" />
-                          Chưa ra đứng trước
-                        </Badge>
                         <Badge
                           variant="outline"
                           className="bg-white border-slate-200 text-slate-600"
@@ -2713,9 +2868,6 @@ export function GameUserPage() {
                               <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                                 <p className="text-lg font-bold text-slate-800">
                                   {selectedTierList.name}
-                                </p>
-                                <p className="text-sm text-slate-400 mt-1">
-                                  Di chuột vào avatar để xem tên và số sao.
                                 </p>
                               </div>
                               {selectedTierBoard.map(({ tier, operators }) => (
@@ -3085,7 +3237,7 @@ export function GameUserPage() {
                         <CardHeader className="pb-3 border-b border-slate-100/50">
                           <div className="flex justify-between items-start">
                             <CardTitle className="text-slate-800 text-xl font-bold mb-1 group-hover:text-cyan-600 transition-colors leading-tight">
-                              {news.title}
+                              {translateGameTerms(news.title)}
                             </CardTitle>
                             <Badge
                               variant="outline"
@@ -3102,17 +3254,9 @@ export function GameUserPage() {
                           <div
                             className="prose prose-sm max-w-none text-slate-600 prose-a:text-cyan-600 prose-img:rounded-xl mb-6 overflow-hidden"
                             dangerouslySetInnerHTML={{
-                              __html: isTranslated
-                                ? translateGameTerms(news.content)
-                                : news.content,
+                              __html: translateGameTerms(news.content),
                             }}
                           />
-                          <a href={news.link} target="_blank" rel="noreferrer">
-                            <Button className="bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold shadow-md w-full md:w-auto">
-                              Xem bài gốc{" "}
-                              <ChevronRight className="w-4 h-4 ml-1" />
-                            </Button>
-                          </a>
                         </CardContent>
                       </Card>
                     );
@@ -3124,70 +3268,6 @@ export function GameUserPage() {
                     <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
                   </div>
                 )}
-              </TabsContent>
-
-              {/* Reward & Link Tab */}
-              <TabsContent
-                value="rewards"
-                className="mt-0 focus-visible:outline-none space-y-4"
-              >
-                <Card className="glass-card border-0 shadow-sm">
-                  <CardHeader className="border-b border-slate-100 pb-5 bg-white/30">
-                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
-                      <div className="p-2 bg-purple-100 rounded-lg border border-purple-200">
-                        <LinkIcon className="w-6 h-6 text-purple-600" />
-                      </div>
-                      Cổng đổi quà chính thức
-                    </CardTitle>
-                    <CardDescription className="text-slate-500 text-base mt-2">
-                      Mở trang redeem của Arknights Global để nhập code và nhận quà.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-6">
-                    <Button
-                      onClick={handleOpenRedeemLink}
-                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white h-14 rounded-xl font-bold text-lg shadow-[0_4px_20px_rgba(168,85,247,0.3)] transition-all flex items-center justify-center gap-2"
-                    >
-                      <Gift className="w-5 h-5" />
-                      Mở trang đổi quà
-                      <ChevronRight className="w-5 h-5 opacity-70" />
-                    </Button>
-
-                    <div className="bg-white/60 rounded-2xl p-5 border border-slate-100 shadow-sm">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Flame className="w-5 h-5 text-orange-500" />
-                        <h3 className="text-slate-800 font-bold text-lg">
-                          Code hiện có
-                        </h3>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {rewardCodesList.map((item) => (
-                          <div
-                            key={item}
-                            className="bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-purple-300 transition-all flex items-center justify-between group hover:shadow-md"
-                          >
-                            <div>
-                              <p className="text-slate-600 text-sm flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                                {item}
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="bg-white text-slate-700 hover:bg-purple-50 hover:text-purple-700 border border-slate-200 group-hover:border-purple-300 rounded-lg shadow-sm"
-                              onClick={() =>
-                                navigator.clipboard.writeText(item)
-                              }
-                            >
-                              Sao chép
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               {/* Gacha Tab */}
@@ -3305,7 +3385,7 @@ export function GameUserPage() {
                             Chỉ 6★
                           </Button>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                           {paginatedGachaData.map(({ item, pityCount, starValue, index }) => {
                             const isSixStar = starValue === 6;
                             const isFiveStar = starValue === 5;
@@ -3534,13 +3614,17 @@ export function GameUserPage() {
               <span className="text-slate-800 font-bold px-2 sm:px-4 text-sm sm:text-base">
                 Tin {newsPage} / {newsTotalPages}
               </span>
-              <button
-                onClick={() => setIsTranslated(!isTranslated)}
-                className="text-xs text-cyan-600 font-semibold hover:text-cyan-700 mt-1 flex items-center transition-colors"
-              >
-                <Languages className="w-3 h-3 mr-1" />
-                {isTranslated ? "Đang dịch" : "Dịch nhanh"}
-              </button>
+              {newsData[0]?.link ? (
+                <a
+                  href={newsData[0].link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-cyan-600 font-semibold hover:text-cyan-700 mt-1 flex items-center transition-colors"
+                >
+                  Xem bản tin gốc
+                  <ChevronRight className="w-3 h-3 ml-1" />
+                </a>
+              ) : null}
             </div>
 
             <Button
