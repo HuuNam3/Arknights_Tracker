@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -51,6 +51,13 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { MainTab, ToolTab } from "@/lib/site-navigation";
+import { BannersTabContent } from "@/components/game-user-page/tabs/banners-tab-content";
+import { CharactersTabContent } from "@/components/game-user-page/tabs/characters-tab-content";
+import { GachaTabContent } from "@/components/game-user-page/tabs/gacha-tab-content";
+import { NewsTabContent } from "@/components/game-user-page/tabs/news-tab-content";
+import { TierListTabContent } from "@/components/game-user-page/tabs/tier-list-tab-content";
+import { ToolsTabContent } from "@/components/game-user-page/tabs/tools-tab-content";
 
 // Mock gacha data
 const mockGachas: Record<
@@ -347,6 +354,7 @@ const RECRUITMENT_SPECIAL_TAGS = new Set<RecruitmentTag>([
   "Top Operator",
   "Senior Operator",
   "Robot",
+  "Specialist",
   "Crowd-Control",
   "Nuker",
   "Summon",
@@ -354,6 +362,26 @@ const RECRUITMENT_SPECIAL_TAGS = new Set<RecruitmentTag>([
   "Shift",
   "Elemental",
 ]);
+
+const RECRUITMENT_PRIORITY_TAGS: RecruitmentTag[] = [
+  "Top Operator",
+  "Senior Operator",
+  "Robot",
+  "Specialist",
+  "Crowd-Control",
+  "Nuker",
+  "Summon",
+  "Fast-Redeploy",
+  "Shift",
+  "Elemental",
+];
+
+const RECRUITMENT_PRIORITY_SCORE = new Map(
+  RECRUITMENT_PRIORITY_TAGS.map((tag, index) => [
+    tag,
+    RECRUITMENT_PRIORITY_TAGS.length - index,
+  ]),
+);
 
 const RECRUITMENT_TAG_GROUPS: RecruitmentTagGroup[] = [
   {
@@ -520,16 +548,16 @@ const getRecruitmentTagClassName = (
 
   if (subtle) {
     if (category === "qualification") {
-      return "rounded-md border-2 border-amber-100 bg-white/80 text-amber-600 opacity-70";
+      return "rounded-md border-2 border-amber-100 bg-white text-amber-600 opacity-70";
     }
     if (category === "position") {
-      return "rounded-md border-2 border-cyan-100 bg-white/80 text-cyan-600 opacity-70";
+      return "rounded-md border-2 border-cyan-100 bg-white text-cyan-600 opacity-70";
     }
     if (category === "class") {
-      return "rounded-md border-2 border-indigo-100 bg-white/80 text-indigo-600 opacity-70";
+      return "rounded-md border-2 border-indigo-100 bg-white text-indigo-600 opacity-70";
     }
 
-    return "rounded-md border-2 border-emerald-100 bg-white/80 text-emerald-600 opacity-70";
+    return "rounded-md border-2 border-emerald-100 bg-white text-emerald-600 opacity-70";
   }
 
   if (category === "qualification") {
@@ -570,6 +598,20 @@ const getRecruitmentRecommendationText = (
 
   return "Combo thường";
 };
+
+const isRecruitmentOperatorEligibleForTags = (
+  operator: RecruitmentOperator,
+  tags: RecruitmentTag[],
+) => {
+  if (operator.rarity === 6 && !tags.includes("Top Operator")) {
+    return false;
+  }
+
+  return tags.every((tag) => operator.tags.includes(tag));
+};
+
+const getRecruitmentComboAttentionScore = (tags: RecruitmentTag[]) =>
+  tags.reduce((score, tag) => score + (RECRUITMENT_PRIORITY_SCORE.get(tag) ?? 0), 0);
 
 const buildRecruitmentTagSubsets = (
   tags: RecruitmentTag[],
@@ -639,7 +681,7 @@ const getRecruitmentComboResults = (
   const combos = combinations
     .map((comboTags) => {
       const operators = RECRUITMENT_OPERATORS.filter((operator) =>
-        comboTags.every((tag) => operator.tags.includes(tag)),
+        isRecruitmentOperatorEligibleForTags(operator, comboTags),
       ).sort((left, right) => {
         if (left.rarity !== right.rarity) {
           return right.rarity - left.rarity;
@@ -670,6 +712,12 @@ const getRecruitmentComboResults = (
     .filter((entry): entry is RecruitmentComboResult => entry !== null);
 
   return filterRedundantRecruitmentCombos(combos).sort((left, right) => {
+    const leftAttentionScore = getRecruitmentComboAttentionScore(left.tags);
+    const rightAttentionScore = getRecruitmentComboAttentionScore(right.tags);
+
+    if (leftAttentionScore !== rightAttentionScore) {
+      return rightAttentionScore - leftAttentionScore;
+    }
     if (left.tags.length !== right.tags.length) {
       return right.tags.length - left.tags.length;
     }
@@ -700,13 +748,13 @@ const getRecruitmentSuggestionsForOperator = (
   );
   const combinations = buildRecruitmentTagSubsets(candidateTags, {
     maxSize: 3,
-    minSize: 2,
+    minSize: 1,
   });
 
   const combos = combinations
     .map((comboTags) => {
       const operators = RECRUITMENT_OPERATORS.filter((candidate) =>
-        comboTags.every((tag) => candidate.tags.includes(tag)),
+        isRecruitmentOperatorEligibleForTags(candidate, comboTags),
       ).sort((left, right) => {
         if (left.rarity !== right.rarity) {
           return right.rarity - left.rarity;
@@ -737,6 +785,12 @@ const getRecruitmentSuggestionsForOperator = (
     .filter((entry): entry is RecruitmentComboResult => entry !== null)
 
   return filterRedundantRecruitmentCombos(combos).sort((left, right) => {
+    const leftAttentionScore = getRecruitmentComboAttentionScore(left.tags);
+    const rightAttentionScore = getRecruitmentComboAttentionScore(right.tags);
+
+    if (leftAttentionScore !== rightAttentionScore) {
+      return rightAttentionScore - leftAttentionScore;
+    }
     if (left.operators.length !== right.operators.length) {
       return left.operators.length - right.operators.length;
     }
@@ -794,6 +848,8 @@ const TOOL_ICON_URLS = {
     "https://arknights.wiki.gg/images/Distinction_Certificate.png",
   headhuntingPermit:
     "https://arknights.wiki.gg/images/Headhunting_Permit.png",
+  intelligenceCertificate:
+    "https://arknights.wiki.gg/images/Intelligence_Certificate.png",
   originiumShard:
     "https://arknights.wiki.gg/images/Originium_Shard.png",
   originitePrime:
@@ -1000,6 +1056,7 @@ type PullPlannerEventBonus = {
 type CommendationShopMode = "phase1" | "phase2" | "phase3";
 
 type PullPlannerState = {
+  annihilationUndoneMaps: string;
   commendations: string;
   commendationShopMode: CommendationShopMode;
   currentBannerKey: string;
@@ -1007,6 +1064,7 @@ type PullPlannerState = {
   distinctions: string;
   eventRewardsEnabled: boolean;
   eventShopEnabled: boolean;
+  intelligenceCertificates: string;
   monthlyCardEnabled: boolean;
   monthlySignInEnabled: boolean;
   originiumShards: string;
@@ -1226,8 +1284,11 @@ const PULL_PLANNER_STORAGE_KEY = "arkreview_pull_planner_v1";
 const TIER_DRAFT_KEY = "arkreview_tierlist_draft_v1";
 const TIER_LISTS_KEY = "arkreview_tierlists_v1";
 const LIMITED_LUCKY_BOARD_EXPECTED_ORUNDUM = 8170;
+const ANNIHILATION_FIRST_CLEAR_ORUNDUM_PER_MAP = 1500;
 const COMMENDATION_SHOP_MONTHLY_PERMITS = 2;
 const DAILY_SIGNIN_PERMIT_DAY = 17;
+const INTELLIGENCE_CERTIFICATE_ORUNDUM_COST = 20;
+const INTELLIGENCE_CERTIFICATE_ORUNDUM_REWARD = 100;
 const COMMENDATION_PERMIT_COST = 240;
 const COMMENDATION_ORUNDUM_BUNDLE_COST = 40;
 const COMMENDATION_ORUNDUM_BUNDLE_SIZE = 100;
@@ -1246,6 +1307,7 @@ const DISTINCTION_SHOP_BATCHES = [
 ] as const;
 
 const DEFAULT_PULL_PLANNER: PullPlannerState = {
+  annihilationUndoneMaps: "0",
   commendations: "0",
   commendationShopMode: "phase1",
   currentBannerKey: "",
@@ -1253,6 +1315,7 @@ const DEFAULT_PULL_PLANNER: PullPlannerState = {
   distinctions: "0",
   eventRewardsEnabled: false,
   eventShopEnabled: false,
+  intelligenceCertificates: "0",
   monthlyCardEnabled: false,
   monthlySignInEnabled: false,
   originiumShards: "0",
@@ -1395,6 +1458,10 @@ const hydratePullPlannerState = (value: unknown): PullPlannerState | null => {
   const candidate = value as Partial<Record<keyof PullPlannerState, unknown>>;
 
   return {
+    annihilationUndoneMaps:
+      typeof candidate.annihilationUndoneMaps === "string"
+        ? candidate.annihilationUndoneMaps
+        : DEFAULT_PULL_PLANNER.annihilationUndoneMaps,
     commendations:
       typeof candidate.commendations === "string"
         ? candidate.commendations
@@ -1425,6 +1492,10 @@ const hydratePullPlannerState = (value: unknown): PullPlannerState | null => {
       typeof candidate.eventShopEnabled === "boolean"
         ? candidate.eventShopEnabled
         : DEFAULT_PULL_PLANNER.eventShopEnabled,
+    intelligenceCertificates:
+      typeof candidate.intelligenceCertificates === "string"
+        ? candidate.intelligenceCertificates
+        : DEFAULT_PULL_PLANNER.intelligenceCertificates,
     monthlyCardEnabled:
       typeof candidate.monthlyCardEnabled === "boolean"
         ? candidate.monthlyCardEnabled
@@ -1845,8 +1916,14 @@ const getPlannerResourceCardClassName = (resource: string) => {
   if (resource === "Headhunting Permit") {
     return "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2";
   }
+  if (resource === "Intelligence Certificate") {
+    return "rounded-lg border border-rose-200 bg-rose-50 px-3 py-2";
+  }
+  if (resource === "Originium Shard") {
+    return "rounded-lg border border-violet-200 bg-violet-50 px-3 py-2";
+  }
 
-  return "rounded-lg border border-violet-200 bg-violet-50 px-3 py-2";
+  return "rounded-lg border border-amber-200 bg-amber-50 px-3 py-2";
 };
 
 const getPlannerSourceCardClassName = (label: string) => {
@@ -1967,7 +2044,7 @@ const TierOperatorAvatar = ({
           </div>
         </button>
       </HoverCardTrigger>
-      <HoverCardContent className="w-auto min-w-[180px] rounded-2xl border-slate-200 bg-white/95 p-3 shadow-xl">
+      <HoverCardContent className="w-auto min-w-[180px] rounded-2xl border-slate-200 bg-white p-3 shadow-xl">
         <div className="flex items-center gap-3">
           <OperatorAvatarPreview operator={operator} />
           <div className="min-w-0">
@@ -2017,7 +2094,7 @@ const TierAssignmentAvatar = ({
           <OperatorAvatarPreview operator={operator} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto min-w-[220px] rounded-2xl border-slate-200 bg-white/95 p-3 shadow-xl">
+      <PopoverContent className="w-auto min-w-[220px] rounded-2xl border-slate-200 bg-white p-3 shadow-xl">
         <div className="flex items-center gap-3">
           <OperatorAvatarPreview operator={operator} className="size-12" />
           <div className="min-w-0">
@@ -2115,64 +2192,74 @@ const normalizeSanitySnapshot = (
 
 const UI_TEXT = {
   appTagline:
-    "Tra cá»©u tÃ i khoáº£n, theo dÃµi tin tá»©c vÃ  kiá»ƒm tra lá»‹ch sá»­ gacha Arknights.",
-  searchTitle: "Tra cá»©u tÃ i khoáº£n",
+    "Tra cứu tài khoản, theo dõi tin tức và kiểm tra lịch sử gacha Arknights.",
+  searchTitle: "Tra cứu tài khoản",
   searchDescription:
-    "Nháº­p UID Ä‘á»ƒ láº¥y thÃ´ng tin Doctor vÃ  má»Ÿ cÃ¡c cÃ´ng cá»¥ liÃªn quan.",
-  uidPlaceholder: "Nháº­p UID cá»§a báº¡n",
-  searchButton: "Tra cá»©u",
-  profileTitle: "Há»“ sÆ¡ Doctor",
+    "Nhập UID để lấy thông tin Doctor và mở các công cụ liên quan.",
+  uidPlaceholder: "Nhập UID của bạn",
+  searchButton: "Tra cứu",
+  profileTitle: "Hồ sơ Doctor",
   uidLabel: "UID",
-  nicknameLabel: "TÃªn hiá»ƒn thá»‹",
-  levelLabel: "Cáº¥p Doctor",
-  sanityCapLabel: "Sanity tá»‘i Ä‘a",
-  sanityCapHint: "TÃ­nh theo má»‘c Global hiá»‡n táº¡i",
-  sanityCalcTitle: "MÃ¡y tÃ­nh sanity",
+  nicknameLabel: "Tên hiển thị",
+  levelLabel: "Cấp Doctor",
+  sanityCapLabel: "Sanity tối đa",
+  sanityCapHint: "Tính theo mốc Global hiện tại",
+  sanityCalcTitle: "Máy tính sanity",
   sanityCalcDescription:
-    "Nháº­p lÆ°á»£ng sanity hiá»‡n táº¡i Ä‘á»ƒ tÃ­nh sá»‘ cÃ²n thiáº¿u vÃ  thá»i gian há»“i Ä‘áº§y vá»›i tá»‘c Ä‘á»™ 1 sanity má»—i 6 phÃºt.",
-  sanityInputPlaceholder: "Nháº­p sanity hiá»‡n táº¡i",
-  sanityClampHint: "Náº¿u nháº­p vÆ°á»£t giá»›i háº¡n, há»‡ thá»‘ng sáº½ tá»± giá»›i háº¡n vá»",
-  currentSanityLabel: "Sanity hiá»‡n táº¡i",
-  missingSanityLabel: "CÃ²n thiáº¿u",
-  fullRecoveryLabel: "Äáº§y sau",
-  fullNowLabel: "ÄÃ£ Ä‘áº§y",
-  fullAtPrefix: "Äáº§y lÃºc",
-  inputToCalculate: "Nháº­p sanity Ä‘á»ƒ báº¯t Ä‘áº§u tÃ­nh",
-  eventsTab: "Tin tá»©c",
-  rewardsTab: "Äá»•i quÃ ",
+    "Nhập lượng sanity hiện tại để tính số còn thiếu và thời gian hồi đầy với tốc độ 1 sanity mỗi 6 phút.",
+  sanityInputPlaceholder: "Nhập sanity hiện tại",
+  sanityClampHint: "Nếu nhập vượt giới hạn, hệ thống sẽ tự giới hạn về",
+  currentSanityLabel: "Sanity hiện tại",
+  missingSanityLabel: "Còn thiếu",
+  fullRecoveryLabel: "Đầy sau",
+  fullNowLabel: "Đã đầy",
+  fullAtPrefix: "Đầy lúc",
+  inputToCalculate: "Nhập sanity để bắt đầu tính",
+  eventsTab: "Tin tức",
+  rewardsTab: "Đổi quà",
   gachaTab: "Gacha",
-  detailsButton: "Xem bÃ i gá»‘c",
-  rewardsTitle: "Cá»•ng Ä‘á»•i quÃ  chÃ­nh thá»©c",
+  detailsButton: "Xem bài gốc",
+  rewardsTitle: "Cổng đổi quà chính thức",
   rewardsDescription:
-    "Má»Ÿ trang redeem cá»§a Arknights Global Ä‘á»ƒ nháº­p code vÃ  nháº­n quÃ .",
-  redeemButton: "Má»Ÿ trang Ä‘á»•i quÃ ",
-  codesTitle: "Code hiá»‡n cÃ³",
-  copyButton: "Sao chÃ©p",
-  gachaTitle: "Tra cá»©u lá»‹ch sá»­ gacha",
-  gachaDescription: "DÃ¡n cookie láº¥y tá»«",
-  cookiePlaceholder: "Nháº­p cookie hoáº·c token cá»§a báº¡n",
-  gachaSearchButton: "Táº£i lá»‹ch sá»­",
-  gachaLoading: "Äang táº£i lá»‹ch sá»­ gacha...",
-  totalPullsLabel: "Tá»•ng lÆ°á»£t kÃ©o",
-  recentHistoryTitle: "Lá»‹ch sá»­ gáº§n Ä‘Ã¢y",
-  timeColumn: "Thá»i gian",
-  operatorColumn: "NhÃ¢n váº­t",
-  rarityColumn: "Äá»™ hiáº¿m",
-  typeColumn: "Loáº¡i",
+    "Mở trang redeem của Arknights Global để nhập code và nhận quà.",
+  redeemButton: "Mở trang đổi quà",
+  codesTitle: "Code hiện có",
+  copyButton: "Sao chép",
+  gachaTitle: "Tra cứu lịch sử gacha",
+  gachaDescription: "Dán cookie lấy từ",
+  cookiePlaceholder: "Nhập cookie hoặc token của bạn",
+  gachaSearchButton: "Tải lịch sử",
+  gachaLoading: "Đang tải lịch sử gacha...",
+  totalPullsLabel: "Tổng lượt kéo",
+  recentHistoryTitle: "Lịch sử gần đây",
+  timeColumn: "Thời gian",
+  operatorColumn: "Nhân vật",
+  rarityColumn: "Độ hiếm",
+  typeColumn: "Loại",
   poolColumn: "Banner",
-  noGachaData: "KhÃ´ng tÃ¬m tháº¥y dá»¯ liá»‡u gacha.",
-  perPageLabel: "Hiá»ƒn thá»‹",
-  previousNews: "Tin trÆ°á»›c",
+  noGachaData: "Không tìm thấy dữ liệu gacha.",
+  perPageLabel: "Hiển thị",
+  previousNews: "Tin trước",
   nextNews: "Tin sau",
-  translateIdle: "Dá»‹ch nhanh",
-  translateActive: "Äang dá»‹ch",
-  invalidUidError: "UID khÃ´ng há»£p lá»‡. Vui lÃ²ng kiá»ƒm tra láº¡i.",
-  playerInfoMissing: "KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin Doctor.",
-  connectionError: "KhÃ´ng thá»ƒ káº¿t ná»‘i tá»›i mÃ¡y chá»§. Vui lÃ²ng thá»­ láº¡i sau.",
-  invalidCookieError: "Cookie khÃ´ng há»£p lá»‡ hoáº·c Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng thá»­ láº¡i.",
+  translateIdle: "Dịch nhanh",
+  translateActive: "Đang dịch",
+  invalidUidError: "UID không hợp lệ. Vui lòng kiểm tra lại.",
+  playerInfoMissing: "Không tìm thấy thông tin Doctor.",
+  connectionError: "Không thể kết nối tới máy chủ. Vui lòng thử lại sau.",
+  invalidCookieError: "Cookie không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.",
 } as const;
 
-export function GameUserPage() {
+type GameUserPageProps = {
+  initialActiveTab?: MainTab;
+  initialToolsTab?: ToolTab;
+  standaloneToolPage?: boolean;
+};
+
+export function GameUserPage({
+  initialActiveTab = "tools",
+  initialToolsTab = "pull-planner",
+  standaloneToolPage = false,
+}: GameUserPageProps) {
   const [uid, setUid] = useState("");
   const [userInfo, setUserInfo] = useState<{
     uid: string;
@@ -2186,7 +2273,6 @@ export function GameUserPage() {
   const [isNewsLoading, setIsNewsLoading] = useState(false);
   const [newsPage, setNewsPage] = useState(1);
   const [newsTotalPages, setNewsTotalPages] = useState(1);
-  const [activeTab, setActiveTab] = useState("tools");
   const [pullPlanner, setPullPlanner] =
     useState<PullPlannerState>(DEFAULT_PULL_PLANNER);
   const [hasHydratedPullPlanner, setHasHydratedPullPlanner] = useState(false);
@@ -2259,6 +2345,14 @@ export function GameUserPage() {
   const plannerOrundum = Math.max(0, parseNumberInput(pullPlanner.orundum));
   const plannerPrime = Math.max(0, parseNumberInput(pullPlanner.originitePrime));
   const plannerPermits = Math.max(0, parseNumberInput(pullPlanner.permits));
+  const plannerIntelligenceCertificates = Math.max(
+    0,
+    Math.floor(parseNumberInput(pullPlanner.intelligenceCertificates)),
+  );
+  const plannerIntelligenceOrundum =
+    Math.floor(
+      plannerIntelligenceCertificates / INTELLIGENCE_CERTIFICATE_ORUNDUM_COST,
+    ) * INTELLIGENCE_CERTIFICATE_ORUNDUM_REWARD;
   const plannerCommendations = Math.max(
     0,
     Math.floor(parseNumberInput(pullPlanner.commendations)),
@@ -2267,11 +2361,18 @@ export function GameUserPage() {
     0,
     Math.floor(parseNumberInput(pullPlanner.distinctions)),
   );
+  const plannerAnnihilationUndoneMaps = Math.max(
+    0,
+    Math.floor(parseNumberInput(pullPlanner.annihilationUndoneMaps)),
+  );
   const plannerCommendationShopMode = pullPlanner.commendationShopMode;
   const plannerShards = Math.max(0, Math.floor(parseNumberInput(pullPlanner.originiumShards)));
   const plannerShardOrundum = Math.floor(plannerShards / 2) * 20;
   const plannerCurrentOrundum =
-    plannerOrundum + plannerPrime * 180 + plannerShardOrundum;
+    plannerOrundum +
+    plannerPrime * 180 +
+    plannerShardOrundum +
+    plannerIntelligenceOrundum;
   const plannerCurrentPulls =
     plannerPermits + Math.floor(plannerCurrentOrundum / 600);
   const plannerCurrentLeftoverOrundum = plannerCurrentOrundum % 600;
@@ -2716,6 +2817,8 @@ export function GameUserPage() {
     : 0;
   const plannerFutureRegularOrundum =
     plannerWeeksUntilBanner * plannerWeeklyRegularOrundum;
+  const plannerFutureAnnihilationFirstClearOrundum =
+    plannerAnnihilationUndoneMaps * ANNIHILATION_FIRST_CLEAR_ORUNDUM_PER_MAP;
   const plannerTimelineEventBonuses = pullPlanner.eventRewardsEnabled
     ? pullPlannerTargets
         .filter(
@@ -2814,6 +2917,7 @@ export function GameUserPage() {
     plannerFutureWeeklyMissionOrundum +
     plannerFutureMonthlyCardOrundum +
     plannerFutureRegularOrundum +
+    plannerFutureAnnihilationFirstClearOrundum +
     plannerFutureCommendationShopOrundum;
   const plannerProjectedStartOrundum =
     plannerCurrentOrundum + plannerFutureStableOrundum;
@@ -2926,6 +3030,16 @@ export function GameUserPage() {
       permits: 0,
       scope: "transferable",
     },
+    plannerAnnihilationUndoneMaps > 0
+      ? {
+          detail: `${plannerAnnihilationUndoneMaps} map x ${ANNIHILATION_FIRST_CLEAR_ORUNDUM_PER_MAP} = ${formatOrundumPullSummary(plannerFutureAnnihilationFirstClearOrundum)}`,
+          freePulls: 0,
+          label: "Annihilation first-clear",
+          orundum: plannerFutureAnnihilationFirstClearOrundum,
+          permits: 0,
+          scope: "transferable",
+        }
+      : null,
     pullPlanner.monthlyCardEnabled
       ? {
           detail: `${plannerDaysUntilBanner} ngày x 200 = ${formatOrundumPullSummary(plannerFutureMonthlyCardOrundum)}`,
@@ -3876,8 +3990,14 @@ export function GameUserPage() {
     });
   };
 
+  const renderStandaloneToolPage = standaloneToolPage && initialActiveTab === "tools";
+
   return (
-    <div className="min-h-screen bg-transparent text-slate-800 p-4 md:p-8 relative overflow-hidden font-sans selection:bg-sky-300/40">
+    <div
+      className={`min-h-screen bg-transparent text-slate-800 relative overflow-hidden font-sans selection:bg-sky-300/40 ${
+        renderStandaloneToolPage ? "p-0" : "p-4"
+      }`}
+    >
       {/* Decorative Background Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-sky-200/45 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-teal-200/40 rounded-full blur-[120px] pointer-events-none" />
@@ -3902,9 +4022,7 @@ export function GameUserPage() {
         .animate-fade-in { animation: fade-in-up 0.6s ease-out forwards; }
         .animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
         .glass-card {
-          background: linear-gradient(180deg, rgba(249, 253, 255, 0.84), rgba(243, 249, 250, 0.74));
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
+          background: #ffffff;
           border: 1px solid rgba(143, 188, 214, 0.42);
           box-shadow: 0 16px 40px -18px rgba(39, 94, 122, 0.28);
           transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -3915,9 +4033,7 @@ export function GameUserPage() {
           transform: translateY(-4px);
         }
         .hero-panel {
-          background: linear-gradient(180deg, rgba(250, 253, 255, 0.9), rgba(242, 248, 250, 0.84));
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          background: #ffffff;
           border: 1px solid rgba(148, 184, 204, 0.42);
           box-shadow: 0 18px 50px -24px rgba(15, 23, 42, 0.28);
         }
@@ -3944,2526 +4060,190 @@ export function GameUserPage() {
         .stagger-3 { animation-delay: 0.3s; }
       `}</style>
 
-      <div className="max-w-5xl mx-auto relative z-10">
-        {/* Header */}
-        <div className="mb-12 text-center animate-fade-in">
-          <div className="hero-panel rounded-[2rem] px-6 py-8 md:px-10 md:py-10">
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <Gamepad2 className="w-12 h-12 text-sky-700 animate-pulse-glow animate-float" />
-              <h1 className="hero-title text-5xl md:text-7xl font-black tracking-tight">
-                Arknights Tracker
-              </h1>
-              <Crown
-                className="w-12 h-12 text-amber-600 animate-pulse-glow animate-float"
-                style={{ animationDelay: "1s" }}
-              />
-            </div>
-            <p className="text-slate-700 text-lg md:text-xl font-medium max-w-3xl mx-auto">
-              Theo dõi Characters, Banners, Tier List, Tools, Tin tức và lịch sử
-              Gacha cho Arknights trong một nơi.
-            </p>
-          </div>
-        </div>
-
-        {/* UID Search Section */}
-        <Card className="mb-8 glass-card animate-fade-in stagger-1 border-0">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-slate-800 flex items-center gap-3 text-2xl font-bold">
-              <div className="p-2 bg-cyan-100 rounded-lg border border-cyan-200">
-                <Search className="w-6 h-6 text-cyan-600" />
-              </div>
-              <span>Tra cứu tài khoản</span>
-            </CardTitle>
-            <CardDescription className="text-slate-500 text-base">
-              Nhập UID để lấy thông tin Doctor và mở các công cụ liên quan.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex flex-col md:flex-row gap-3">
-              <div className="relative flex-1">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Shield className="h-5 w-5 text-slate-400" />
-                </div>
-                <Input
-                  placeholder="Nhập UID của bạn"
-                  value={uid}
-                  onChange={(e) => setUid(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-cyan-400 focus:ring-cyan-400/20 pl-10 h-12 text-lg rounded-xl transition-all"
-                />
-              </div>
-              <Button
-                onClick={handleSearch}
-                disabled={isLoading}
-                className="btn-primary text-white px-8 h-12 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2 disabled:opacity-70"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <span>Tra cứu</span>
-                    <ChevronRight className="w-5 h-5" />
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {searchAttempted && userInfo ? (
-              <>
-                <Separator className="bg-slate-200/80" />
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-lg border border-indigo-200">
-                      <Crown className="w-6 h-6 text-indigo-600" />
-                    </div>
-                    <div>
-                      <p className="text-slate-800 text-xl font-bold">Hồ sơ Doctor</p>
-                      <p className="text-slate-500 text-sm">
-                        Kết quả tra cứu theo UID vừa nhập.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <div className="bg-white/60 rounded-xl p-3 border border-slate-100 hover:border-cyan-300 transition-all group relative overflow-hidden shadow-sm hover:shadow-md">
-                      <div className="absolute -right-3 -top-3 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                        <Shield className="w-16 h-16 text-cyan-600" />
-                      </div>
-                      <p className="text-slate-500 text-[10px] mb-1 font-semibold tracking-[0.18em] uppercase">
-                        UID
-                      </p>
-                      <p className="text-cyan-600 text-lg font-black font-mono tracking-tight">
-                        {userInfo.uid}
-                      </p>
-                    </div>
-                    <div className="bg-white/60 rounded-xl p-3 border border-slate-100 hover:border-indigo-300 transition-all group relative overflow-hidden shadow-sm hover:shadow-md">
-                      <div className="absolute -right-3 -top-3 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                        <Sword className="w-16 h-16 text-indigo-600" />
-                      </div>
-                      <p className="text-slate-500 text-[10px] mb-1 font-semibold tracking-[0.18em] uppercase">
-                        Tên hiển thị
-                      </p>
-                      <p className="text-indigo-600 text-lg font-black tracking-tight">
-                        {userInfo.name}
-                      </p>
-                    </div>
-                    <div className="bg-white/60 rounded-xl p-3 border border-slate-100 hover:border-purple-300 transition-all group relative overflow-hidden shadow-sm hover:shadow-md">
-                      <div className="absolute -right-3 -top-3 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                        <Trophy className="w-16 h-16 text-purple-600" />
-                      </div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <p className="text-slate-500 text-[10px] font-semibold tracking-[0.18em] uppercase">
-                          Cấp Doctor
-                        </p>
-                        <Star className="w-3 h-3 text-amber-500 fill-amber-500/20" />
-                      </div>
-                      <p className="text-purple-600 text-lg font-black tracking-tight">
-                        Lv. {userInfo.level}
-                      </p>
-                    </div>
-                    <div className="bg-white/60 rounded-xl p-3 border border-slate-100 hover:border-amber-300 transition-all group relative overflow-hidden shadow-sm hover:shadow-md">
-                      <div className="absolute -right-3 -top-3 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                        <Zap className="w-16 h-16 text-amber-500" />
-                      </div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <p className="text-slate-500 text-[10px] font-semibold tracking-[0.18em] uppercase">
-                          Sanity tối đa
-                        </p>
-                        <Zap className="w-3 h-3 text-amber-500" />
-                      </div>
-                      <p className="text-amber-600 text-lg font-black tracking-tight">
-                        {sanityCap}
-                      </p>
-                      <p className="text-slate-400 text-[10px] mt-1.5">
-                        Tính theo mốc Global hiện tại
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : errorMessage ? (
-              <Alert className="border-red-200 bg-red-50 backdrop-blur-md text-red-800 rounded-xl animate-fade-in shadow-sm">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <AlertDescription className="ml-2 font-medium text-base">
-                  {errorMessage}
-                </AlertDescription>
-              </Alert>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        {/* Main Content Tabs */}
+      <div
+        className={`relative z-10 ${renderStandaloneToolPage ? "w-full" : "mx-auto max-w-5xl"}`}
+      >
+        {/* Main Content */}
         <div className="animate-fade-in stagger-2">
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 bg-[#f7fbff]/85 backdrop-blur-xl border border-sky-200/70 p-1.5 rounded-2xl shadow-[0_18px_45px_-24px_rgba(14,116,144,0.35)] mb-6 h-auto gap-1.5">
-                <TabsTrigger
-                  value="tools"
-                  className="py-3 text-slate-500 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                >
-                  <Wrench className="w-5 h-5 mr-2" />
-                  Tools
-                </TabsTrigger>
-                <TabsTrigger
-                  value="characters"
-                  className="py-3 text-slate-500 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:border-emerald-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                >
-                  <Users className="w-5 h-5 mr-2" />
-                  Characters
-                </TabsTrigger>
-                <TabsTrigger
-                  value="banners"
-                  className="py-3 text-slate-500 data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:border-sky-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                >
-                  <GalleryHorizontal className="w-5 h-5 mr-2" />
-                  Banners
-                </TabsTrigger>
-                <TabsTrigger
-                  value="tierlist"
-                  className="py-3 text-slate-500 data-[state=active]:bg-rose-50 data-[state=active]:text-rose-700 data-[state=active]:border-rose-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                >
-                  <Trophy className="w-5 h-5 mr-2" />
-                  Tier List
-                </TabsTrigger>
-                <TabsTrigger
-                  value="events"
-                  className="py-3 text-slate-500 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 data-[state=active]:border-cyan-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                >
-                  <Gamepad2 className="w-5 h-5 mr-2" />
-                  Tin tức
-                </TabsTrigger>
-                <TabsTrigger
-                  value="gacha"
-                  className="py-3 text-slate-500 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                >
-                  <Diamond className="w-5 h-5 mr-2" />
-                  Gacha
-                </TabsTrigger>
-              </TabsList>
+            <Tabs value={initialActiveTab} className="w-full">
 
               <TabsContent
                 value="tools"
                 className="mt-0 focus-visible:outline-none space-y-6"
               >
-                <Card className="glass-card border-0 shadow-sm overflow-hidden">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-orange-500 to-yellow-500" />
-                    <CardHeader className="pb-4 bg-gradient-to-r from-sky-50/75 to-white/55 border-b border-sky-100/80">
-                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
-                      <div className="p-2 bg-amber-100 rounded-lg border border-amber-200">
-                        <Wrench className="w-6 h-6 text-amber-600" />
-                      </div>
-                      Tools
-                    </CardTitle>
-                    <CardDescription className="text-slate-500 text-base">
-                      Tập hợp các công cụ tính toán và theo dõi nhanh để hỗ trợ
-                      quá trình chơi Arknights mỗi ngày.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <Tabs defaultValue="pull-planner" className="w-full space-y-6">
-                      <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 bg-[#f9fcff]/85 backdrop-blur-xl border border-sky-200/70 p-1.5 rounded-2xl shadow-[0_18px_45px_-24px_rgba(14,116,144,0.28)] h-auto gap-1.5">
-                        <TabsTrigger
-                          value="pull-planner"
-                          className="py-3 text-slate-500 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                        >
-                          <Diamond className="w-5 h-5 mr-2" />
-                          Pull Planner
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="sanity"
-                          className="py-3 text-slate-500 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                        >
-                          <Zap className="w-5 h-5 mr-2" />
-                          Sanity
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="recruitment"
-                          className="py-3 text-slate-500 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:border-amber-200 border border-transparent rounded-xl transition-all font-bold text-base shadow-sm data-[state=active]:shadow-md"
-                        >
-                          <Users className="w-5 h-5 mr-2" />
-                          Recruitment
-                        </TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="pull-planner" className="mt-0 focus-visible:outline-none">
-                        <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-slate-800 font-bold text-lg">Pull Planner</p>
-                            <p className="text-slate-500 text-sm mt-1">
-                              Tính pull hiện có và ước tính số pull tích lũy được
-                              tới banner mục tiêu.
-                            </p>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className="bg-white border-slate-200 text-slate-600"
-                          >
-                            Banner planner
-                          </Badge>
-                        </div>
-
-                        {pullPlannerTargets.length > 0 ? (
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-slate-700">
-                              Banner mục tiêu
-                            </label>
-                            <select
-                              value={selectedPullPlannerTarget?.id ?? ""}
-                              onChange={(e) =>
-                                handlePullPlannerChange("currentBannerKey", e.target.value)
-                              }
-                              className="w-full h-12 rounded-xl border border-slate-200 bg-white/80 px-4 text-slate-800"
-                            >
-                              {pullPlannerTargets.map((target) => (
-                                <option key={target.id} value={target.id}>
-                                  {target.name} - {target.dateLabel}
-                                  {target.isPredicted ? " (Dự đoán)" : " (Đã xác nhận)"}
-                                </option>
-                              ))}
-                            </select>
-                            {selectedPullPlannerTarget ? (
-                              <p className="text-xs text-slate-500">
-                                {selectedPullPlannerTarget.isPredicted
-                                  ? selectedPullPlannerTarget.details
-                                    ? `Ngày trên là ngày dự đoán từ CN sang Global, dựa trên ${selectedPullPlannerTarget.details.sampleSize} banner ${selectedPullPlannerTarget.details.reason}.`
-                                    : "Ngày trên là ngày dự đoán từ CN sang Global."
-                                  : "Ngày trên là ngày banner đã có lịch Global."}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <Alert className="border-slate-200 bg-slate-50 text-slate-700 rounded-xl">
-                            <AlertCircle className="h-5 w-5 text-slate-500" />
-                            <AlertDescription className="ml-2 text-sm">
-                              Chưa có banner tương lai để lên kế hoạch.
-                            </AlertDescription>
-                          </Alert>
-                        )}
-
-                        <div className="space-y-2">
-                          <p className="text-sm text-slate-600">
-                            Nhập tài nguyên hiện có của bạn, gồm cả cert, để quy đổi pull
-                            hiện tại và tính phần shop trước banner.
-                          </p>
-                          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                            <div className="bg-white/60 rounded-2xl p-3 border border-slate-100 shadow-sm space-y-2">
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src={TOOL_ICON_URLS.orundum}
-                                  alt="Orundum"
-                                  className="size-5 object-contain"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
-                                />
-                                <p className="font-semibold text-sm text-slate-800">Orundum</p>
-                              </div>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={pullPlanner.orundum}
-                                onChange={(e) =>
-                                  handlePullPlannerChange("orundum", e.target.value)
-                                }
-                                placeholder="Orundum"
-                                className="bg-white/80 border-slate-200 rounded-xl"
-                              />
-                              <p className="text-[11px] leading-4 text-slate-500">
-                                600 Orundum = 1 pull
-                              </p>
-                            </div>
-                            <div className="bg-white/60 rounded-2xl p-3 border border-slate-100 shadow-sm space-y-2">
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src={TOOL_ICON_URLS.originitePrime}
-                                  alt="Originite Prime"
-                                  className="size-5 object-contain"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
-                                />
-                                <p className="font-semibold text-sm text-slate-800">
-                                  Originite Prime
-                                </p>
-                              </div>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={pullPlanner.originitePrime}
-                                onChange={(e) =>
-                                  handlePullPlannerChange("originitePrime", e.target.value)
-                                }
-                                placeholder="Originite Prime"
-                                className="bg-white/80 border-slate-200 rounded-xl"
-                              />
-                              <p className="text-[11px] leading-4 text-slate-500">
-                                1 OP = 180 Orundum
-                              </p>
-                            </div>
-                            <div className="bg-white/60 rounded-2xl p-3 border border-slate-100 shadow-sm space-y-2">
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src={TOOL_ICON_URLS.headhuntingPermit}
-                                  alt="Headhunting Permit"
-                                  className="size-5 object-contain"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
-                                />
-                                <p className="font-semibold text-sm text-slate-800">
-                                  Headhunting Permit
-                                </p>
-                              </div>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={pullPlanner.permits}
-                                onChange={(e) =>
-                                  handlePullPlannerChange("permits", e.target.value)
-                                }
-                                placeholder="Headhunting Permit"
-                                className="bg-white/80 border-slate-200 rounded-xl"
-                              />
-                              <p className="text-[11px] leading-4 text-slate-500">
-                                1 permit = 1 pull
-                              </p>
-                            </div>
-                            <div className="bg-white/60 rounded-2xl p-3 border border-slate-100 shadow-sm space-y-2">
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src={TOOL_ICON_URLS.originiumShard}
-                                  alt="Originium Shard"
-                                  className="size-5 object-contain"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
-                                />
-                                <p className="font-semibold text-sm text-slate-800">
-                                  Originium Shard
-                                </p>
-                              </div>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={pullPlanner.originiumShards}
-                                onChange={(e) =>
-                                  handlePullPlannerChange("originiumShards", e.target.value)
-                                }
-                                placeholder="Originium Shard"
-                                className="bg-white/80 border-slate-200 rounded-xl"
-                              />
-                              <p className="text-[11px] leading-4 text-slate-500">
-                                60 shard = 1 pull
-                              </p>
-                            </div>
-                            <div className="bg-white/60 rounded-2xl p-3 border border-slate-100 shadow-sm space-y-2">
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src={TOOL_ICON_URLS.commendationCertificate}
-                                  alt="Commendation Certificate"
-                                  className="size-5 object-contain"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
-                                />
-                                <p className="font-semibold text-sm text-slate-800">
-                                  Commendations
-                                </p>
-                              </div>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={pullPlanner.commendations}
-                                onChange={(e) =>
-                                  handlePullPlannerChange("commendations", e.target.value)
-                                }
-                                placeholder="Commendations"
-                                className="bg-white/80 border-slate-200 rounded-xl"
-                              />
-                              <p className="text-[11px] leading-4 text-slate-500">
-                                Tính phần mua roll trong Commendation shop
-                              </p>
-                              <div className="grid grid-cols-3 gap-1">
-                                {([
-                                  ["phase1", "P1"],
-                                  ["phase2", "P2"],
-                                  ["phase3", "P3"],
-                                ] as const).map(([mode, label]) => (
-                                  <button
-                                    key={mode}
-                                    type="button"
-                                    onClick={() =>
-                                      handlePullPlannerChange(
-                                        "commendationShopMode",
-                                        mode,
-                                      )
-                                    }
-                                    className={`rounded-lg border px-2 py-1 text-[10px] font-semibold transition-colors ${
-                                      pullPlanner.commendationShopMode === mode
-                                        ? "border-amber-300 bg-amber-50 text-amber-700"
-                                        : "border-slate-200 bg-white/70 text-slate-500 hover:border-slate-300"
-                                    }`}
-                                  >
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
-                              <p className="text-[11px] leading-4 text-slate-500">
-                                {pullPlanner.commendationShopMode === "phase1"
-                                  ? "Chỉ lấy phần roll ở Phase 1 mỗi tháng."
-                                  : pullPlanner.commendationShopMode === "phase2"
-                                    ? "Nếu đủ clear shop tháng đó, planner sẽ xuống Phase 2 để lấy thêm permit."
-                                    : "Nếu đủ clear hết Phase 1 và 2, phần cert dư sẽ đổi Orundum ở Phase 3."}
-                              </p>
-                            </div>
-                            <div className="bg-white/60 rounded-2xl p-3 border border-slate-100 shadow-sm space-y-2">
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src={TOOL_ICON_URLS.distinctionCertificate}
-                                  alt="Distinction Certificate"
-                                  className="size-5 object-contain"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
-                                />
-                                <p className="font-semibold text-sm text-slate-800">
-                                  Distinctions
-                                </p>
-                              </div>
-                              <Input
-                                type="number"
-                                min={0}
-                                value={pullPlanner.distinctions}
-                                onChange={(e) =>
-                                  handlePullPlannerChange("distinctions", e.target.value)
-                                }
-                                placeholder="Distinctions"
-                                className="bg-white/80 border-slate-200 rounded-xl"
-                              />
-                              <p className="text-[11px] leading-4 text-slate-500">
-                                Tính permit mua được trong Distinction shop
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                          <label className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={pullPlanner.dailyMissionEnabled}
-                              onChange={(e) =>
-                                handlePullPlannerChange(
-                                  "dailyMissionEnabled",
-                                  e.target.checked,
-                                )
-                              }
-                              className="size-4 accent-amber-600"
-                            />
-                            <div>
-                              <p className="font-semibold text-slate-800">
-                                Daily mission
-                              </p>
-                              <p className="text-sm text-slate-500">
-                                100 Orundum / ngày
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                Bật nếu bạn sẽ làm đủ daily mỗi ngày tới banner.
-                              </p>
-                            </div>
-                          </label>
-
-                          <label className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={pullPlanner.weeklyMissionEnabled}
-                              onChange={(e) =>
-                                handlePullPlannerChange(
-                                  "weeklyMissionEnabled",
-                                  e.target.checked,
-                                )
-                              }
-                              className="size-4 accent-amber-600"
-                            />
-                            <div>
-                              <p className="font-semibold text-slate-800">
-                                Weekly mission
-                              </p>
-                              <p className="text-sm text-slate-500">
-                                500 Orundum / tuần
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                Bật nếu bạn sẽ làm đủ weekly mỗi tuần tới banner.
-                              </p>
-                            </div>
-                          </label>
-
-                          <label className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={pullPlanner.monthlySignInEnabled}
-                              onChange={(e) =>
-                                handlePullPlannerChange(
-                                  "monthlySignInEnabled",
-                                  e.target.checked,
-                                )
-                              }
-                              className="size-4 accent-amber-600"
-                            />
-                            <div>
-                              <p className="font-semibold text-slate-800">
-                                Sign-in tháng
-                              </p>
-                              <p className="text-sm text-slate-500">
-                                1 permit ở mốc ngày 17
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                Bật nếu bạn đăng nhập đủ 17 ngày trong một tháng trước banner.
-                              </p>
-                            </div>
-                          </label>
-
-                          <label className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={pullPlanner.monthlyCardEnabled}
-                              onChange={(e) =>
-                                handlePullPlannerChange(
-                                  "monthlyCardEnabled",
-                                  e.target.checked,
-                                )
-                              }
-                              className="size-4 accent-amber-600"
-                            />
-                            <div>
-                              <p className="font-semibold text-slate-800">
-                                Thẻ tháng
-                              </p>
-                              <p className="text-sm text-slate-500">
-                                200 Orundum / ngày
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                Bật nếu Monthly Card của bạn còn hiệu lực tới banner.
-                              </p>
-                            </div>
-                          </label>
-
-                          <label className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={pullPlanner.eventRewardsEnabled}
-                              onChange={(e) =>
-                                handlePullPlannerChange(
-                                  "eventRewardsEnabled",
-                                  e.target.checked,
-                                )
-                              }
-                              className="size-4 accent-amber-600"
-                            />
-                            <div>
-                              <p className="font-semibold text-slate-800">
-                                Đăng nhập sự kiện limit
-                              </p>
-                              <p className="text-sm text-slate-500">
-                                Tách riêng free pull/vé khóa banner và Orundum tích trữ được
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                Bật nếu bạn sẽ đăng nhập trong các sự kiện limit/collab trước và tới banner target.
-                              </p>
-                            </div>
-                          </label>
-
-                          <label className="bg-white rounded-xl border border-slate-100 p-4 flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={pullPlanner.eventShopEnabled}
-                              disabled={!pullPlanner.eventRewardsEnabled}
-                              onChange={(e) =>
-                                handlePullPlannerChange(
-                                  "eventShopEnabled",
-                                  e.target.checked,
-                                )
-                              }
-                              className="size-4 accent-amber-600 disabled:opacity-50"
-                            />
-                            <div>
-                              <p className="font-semibold text-slate-800">
-                                Đổi shop sự kiện
-                              </p>
-                              <p className="text-sm text-slate-500">
-                                Event thường 3 roll, limit/collab 5 roll
-                              </p>
-                              <p className="text-xs text-slate-400 mt-1">
-                                Bật nếu bạn sẽ farm đủ currency để lấy phần roll trong shop sự kiện.
-                              </p>
-                            </div>
-                          </label>
-
-                          <div className="bg-white rounded-xl border border-slate-100 p-4">
-                            <p className="font-semibold text-slate-800 mb-2">
-                              Annihilation mỗi tuần
-                            </p>
-                            <Input
-                              type="number"
-                              min={0}
-                              max={1800}
-                              value={pullPlanner.weeklyRegularOrundum}
-                              onChange={(e) =>
-                                handlePullPlannerChange(
-                                  "weeklyRegularOrundum",
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="0 - 1800"
-                              className="bg-white/80 border-slate-200 rounded-xl"
-                            />
-                            <p className="text-xs text-slate-500 mt-2">
-                              Nhập lượng Orundum mỗi tuần bạn chắc chắn lấy được, tối đa 1800.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 space-y-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="font-semibold text-slate-800">
-                              Chi tiết nguồn tích lũy trước banner
-                            </p>
-                            <Badge
-                              variant="outline"
-                              className="bg-white border-slate-200 text-slate-600"
-                            >
-                              {plannerReachableShopMonths} kỳ shop trước banner
-                            </Badge>
-                          </div>
-                          <div className="rounded-xl border border-slate-100 bg-white px-3 py-3 space-y-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="font-medium text-slate-800">
-                                Tài nguyên hiện tại
-                              </p>
-                              <p className="text-xs text-slate-600 whitespace-nowrap">
-                                {plannerCurrentPulls} pull hiện có
-                              </p>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-slate-600">
-                              <div className={getPlannerResourceCardClassName("Orundum")}>
-                                <p className="text-slate-500">Orundum</p>
-                                <p className="font-semibold text-slate-800">
-                                  {plannerOrundum}
-                                </p>
-                                <p className="text-slate-500 mt-1">
-                                  = {Math.floor(plannerOrundum / 600)} pull
-                                </p>
-                              </div>
-                              <div className={getPlannerResourceCardClassName("Originite Prime")}>
-                                <p className="text-slate-500">Originite Prime</p>
-                                <p className="font-semibold text-slate-800">
-                                  {plannerPrime} OP = {plannerPrime * 180} Orundum
-                                </p>
-                                <p className="text-slate-500 mt-1">
-                                  = {Math.floor((plannerPrime * 180) / 600)} pull
-                                </p>
-                              </div>
-                              <div className={getPlannerResourceCardClassName("Headhunting Permit")}>
-                                <p className="text-slate-500">Headhunting Permit</p>
-                                <p className="font-semibold text-slate-800">
-                                  {plannerPermits} permit
-                                </p>
-                                <p className="text-slate-500 mt-1">
-                                  = {plannerPermits} pull
-                                </p>
-                              </div>
-                              <div className={getPlannerResourceCardClassName("Originium Shard")}>
-                                <p className="text-slate-500">Originium Shard</p>
-                                <p className="font-semibold text-slate-800">
-                                  {plannerShards} shard = {plannerShardOrundum} Orundum
-                                </p>
-                                <p className="text-slate-500 mt-1">
-                                  = {Math.floor(plannerShardOrundum / 600)} pull
-                                </p>
-                              </div>
-                            </div>
-                            <p className="text-xs text-slate-500">
-                              Tổng quy đổi hiện tại: {plannerCurrentOrundum} Orundum +{" "}
-                              {plannerPermits} permit, còn dư {plannerCurrentLeftoverOrundum} Orundum sau quy đổi pull.
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            {plannerStableBreakdown.map((source) => (
-                              <div
-                                key={`${source.label}-${source.detail}`}
-                                className={getPlannerSourceCardClassName(source.label)}
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="font-medium text-slate-800">
-                                      {source.label}
-                                    </p>
-                                    <span
-                                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                        source.scope === "target-only"
-                                          ? "bg-rose-100 text-rose-700"
-                                          : "bg-sky-100 text-sky-700"
-                                      }`}
-                                    >
-                                      {source.scope === "target-only"
-                                        ? "Chỉ banner target"
-                                        : "Mang sang được"}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-slate-500">
-                                    {source.detail}
-                                  </p>
-                                </div>
-                                <div className="text-right text-xs text-slate-600 whitespace-nowrap">
-                                  <p>+{source.orundum} Orundum</p>
-                                  <p>+{source.permits} permit</p>
-                                  {source.freePulls > 0 ? (
-                                    <p>+{source.freePulls} free pull</p>
-                                  ) : null}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
-                            <p className="text-xs text-slate-500 uppercase font-semibold">
-                              Pull hiện có
-                            </p>
-                            <p className="text-2xl font-black text-slate-800 mt-1">
-                              {plannerCurrentPulls}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-2">
-                              Từ kho hiện tại, chưa tính phần farm thêm.
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-cyan-50 p-4">
-                            <p className="text-xs text-slate-500 uppercase font-semibold">
-                              Pull mang sang được
-                            </p>
-                            <p className="text-2xl font-black text-sky-700 mt-1">
-                              {plannerProjectedTransferablePulls}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-2">
-                              Bao gồm Orundum/permit tích trữ tới banner, còn dư{" "}
-                              {plannerProjectedTransferableLeftoverOrundum} Orundum sau quy đổi.
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4">
-                            <p className="text-xs text-slate-500 uppercase font-semibold">
-                              Tổng dùng trên banner target
-                            </p>
-                            <p className="text-2xl font-black text-amber-600 mt-1">
-                              {plannerProjectedBannerPulls}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-2">
-                              Gồm {plannerProjectedTransferablePulls} pull mang sang được +{" "}
-                              {plannerTargetOnlyPulls} pull khóa trên banner target, còn dư{" "}
-                              {plannerProjectedBannerLeftoverOrundum} Orundum quy đổi.
-                            </p>
-                          </div>
-                        </div>
-
-                        <p className="text-sm text-slate-500">
-                          {selectedPullPlannerTarget
-                            ? `Tính từ hôm nay tới ${selectedPullPlannerTarget.name} còn ${plannerDaysUntilBanner} ngày, tương đương ${plannerWeeksUntilBanner} tuần tròn và xấp xỉ ${plannerMonthsUntilBanner.toFixed(1)} tháng để cộng nguồn ổn định. Pull "mang sang được" là số an toàn để quyết định save; free pull hoặc vé khóa banner chỉ được cộng ở ô tổng dùng trên banner target.`
-                            : "Chọn một banner tương lai để bắt đầu tính."}
-                        </p>
-                        </div>
-                      </TabsContent>
-
-                      <TabsContent value="sanity" className="mt-0 focus-visible:outline-none">
-                        {userInfo ? (
-                          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_1fr] gap-6">
-                            <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
-                              <div className="flex items-center justify-between gap-3 mb-4">
-                                <div className="flex items-center gap-2">
-                                  <Zap className="w-5 h-5 text-amber-500" />
-                                  <h3 className="text-slate-800 font-bold text-lg">
-                                    Máy tính sanity
-                                  </h3>
-                                </div>
-                                <Badge
-                                  variant="outline"
-                                  className="bg-white border-slate-200 text-slate-600"
-                                >
-                                  Cap {sanityCap}
-                                </Badge>
-                              </div>
-                              <p className="text-slate-500 text-sm mb-3">
-                                Nhập lượng sanity hiện tại để tính số còn thiếu và thời gian
-                                hồi đầy với tốc độ 1 sanity mỗi 6 phút.
-                              </p>
-                              <Input
-                                type="number"
-                                min={0}
-                                max={sanityCap}
-                                inputMode="numeric"
-                                value={currentSanityInput}
-                                onChange={(e) => hydrateSanityFromInput(e.target.value)}
-                                placeholder={`Nhập sanity hiện tại (0 - ${sanityCap})`}
-                                className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:ring-amber-400/20 h-12 text-lg rounded-xl"
-                              />
-                              <p className="text-xs text-slate-400 mt-2">
-                                Nếu nhập vượt giới hạn, hệ thống sẽ tự giới hạn về {sanityCap}.
-                              </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
-                                  Sanity hiện tại
-                                </p>
-                                <p className="text-slate-800 text-3xl font-black tracking-tight">
-                                  {currentSanity !== null ? currentSanity : "--"}
-                                </p>
-                              </div>
-                              <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
-                                  Còn thiếu
-                                </p>
-                                <p className="text-rose-500 text-3xl font-black tracking-tight">
-                                  {missingSanity !== null ? missingSanity : "--"}
-                                </p>
-                              </div>
-                              <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm">
-                                <p className="text-slate-500 text-sm font-semibold tracking-widest uppercase mb-2">
-                                  Đầy sau
-                                </p>
-                                <p className="text-emerald-600 text-2xl font-black tracking-tight">
-                                  {recoveryMinutes !== null
-                                    ? formatRecoveryDuration(recoveryMinutes)
-                                    : "--"}
-                                </p>
-                                <p className="text-slate-400 text-xs mt-2">
-                                  {recoveryMinutes !== null
-                                    ? recoveryMinutes === 0
-                                      ? "Đã đầy"
-                                      : `Đầy lúc ${formatRecoveryDateTime(recoveryMinutes)}`
-                                    : "Nhập sanity để bắt đầu tính"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <Alert className="border-amber-200 bg-amber-50 text-amber-900 rounded-xl">
-                            <AlertCircle className="h-5 w-5 text-amber-600" />
-                            <AlertDescription className="ml-2 font-medium text-base">
-                              Nhập UID ở phía trên để lấy level Doctor và dùng máy tính sanity.
-                            </AlertDescription>
-                          </Alert>
-                        )}
-                      </TabsContent>
-
-                      <TabsContent value="recruitment" className="mt-0 focus-visible:outline-none">
-                        <div className="bg-white/60 rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-slate-800 font-bold text-lg">
-                              Recruitment Calculator
-                            </p>
-                            <p className="text-slate-500 text-sm mt-1">
-                              Chọn các tag bạn đang có, tối đa 6 tag, để xem combo hợp lệ
-                              và operator có thể ra từ recruitment pool hiện có.
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedRecruitmentTags([]);
-                              setRecruitmentTargetInput("");
-                            }}
-                            className="rounded-lg"
-                          >
-                            Reset
-                          </Button>
-                        </div>
-
-                        <div className="space-y-3">
-                          {RECRUITMENT_TAG_GROUPS.map((group) => (
-                            <div
-                              key={group.category}
-                              className="rounded-xl border border-slate-100 bg-white/70 p-3"
-                            >
-                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                {group.label}
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {group.tags.map((tag) => {
-                                  const active = selectedRecruitmentTags.includes(tag);
-                                  const highlighted = RECRUITMENT_SPECIAL_TAGS.has(tag);
-
-                                  return (
-                                    <Button
-                                      key={tag}
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      ref={(element) => {
-                                        recruitmentTagButtonRefs.current[tag] = element;
-                                      }}
-                                      onClick={(event) =>
-                                        handleToggleRecruitmentTag(tag, event.currentTarget)
-                                      }
-                                      className={`${getRecruitmentTagClassName(tag, {
-                                        active,
-                                        highlighted,
-                                      })} h-10 px-3 py-2`}
-                                    >
-                                      <span className="flex items-center gap-1.5 leading-tight">
-                                        {active ? (
-                                          <Check className="h-3.5 w-3.5 shrink-0" />
-                                        ) : null}
-                                        <span className="font-semibold">{tag}</span>
-                                        {highlighted ? (
-                                          <span className="text-[10px] opacity-80">
-                                            Nên để ý
-                                          </span>
-                                        ) : null}
-                                      </span>
-                                    </Button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="rounded-xl border border-slate-100 bg-white p-4 space-y-3">
-                          <div>
-                            <p className="font-bold text-slate-800">Gợi ý theo operator mục tiêu</p>
-                            <p className="text-sm text-slate-500 mt-1">
-                              Nhập tên operator muốn ra để xem các combo tag phù hợp.
-                            </p>
-                          </div>
-                          <Input
-                            value={recruitmentTargetInput}
-                            onChange={(e) => setRecruitmentTargetInput(e.target.value)}
-                            placeholder="Ví dụ: Saria, Myrtle, Phantom..."
-                            className="bg-white/80 border-slate-200 rounded-xl"
-                          />
-                          {normalizedRecruitmentTargetInput ? (
-                            selectedRecruitmentTargetOperator ? (
-                              <div className="space-y-3">
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                                  <div className="flex items-center gap-3">
-                                    <div className="size-14 overflow-hidden rounded-2xl border border-slate-200 bg-white shrink-0">
-                                      <img
-                                        src={getOperatorAvatarUrl(selectedRecruitmentTargetOperator.name)}
-                                        alt={selectedRecruitmentTargetOperator.name}
-                                        className="h-full w-full object-cover"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = "none";
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <p className="font-semibold text-slate-800">
-                                          Mục tiêu: {selectedRecruitmentTargetOperator.name}
-                                        </p>
-                                        <Badge
-                                          variant="outline"
-                                          className="border-slate-200 bg-white text-slate-600"
-                                        >
-                                          {"★".repeat(selectedRecruitmentTargetOperator.rarity)}
-                                        </Badge>
-                                      </div>
-                                      <p className="mt-2 text-xs text-slate-500">
-                                        Các combo dưới đây đều có thể ra operator này. Tôi ưu tiên
-                                        combo hẹp pool hơn để bạn dễ quyết định.
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  {recruitmentTargetSuggestions.slice(0, 6).map((combo) => (
-                                    <div
-                                      key={`target-${selectedRecruitmentTargetOperator.name}-${combo.tags.join("|")}`}
-                                      className="rounded-xl border border-slate-100 bg-slate-50/70 p-3"
-                                    >
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        {combo.tags.map((tag) => (
-                                          <span
-                                            key={`target-${selectedRecruitmentTargetOperator.name}-${tag}`}
-                                            className={`${getRecruitmentTagClassName(tag, {
-                                              active: true,
-                                            })} px-2 py-1 text-[11px] font-semibold`}
-                                          >
-                                            {tag}
-                                          </span>
-                                        ))}
-                                        {combo.operators.length === 1 ? (
-                                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                                            Khóa đúng 1 operator
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                      <p className="mt-1 text-base font-bold text-slate-900">
-                                        Operator:{" "}
-                                        {combo.operators.map((operator) => operator.name).join(", ")}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-sm text-slate-500">
-                                Không tìm thấy operator recruitable nào khớp tên bạn nhập.
-                              </div>
-                            )
-                          ) : null}
-                        </div>
-
-                        <div className="space-y-3">
-                          {selectedRecruitmentTags.length === 0 ? (
-                            <div className="bg-white rounded-xl border border-slate-100 p-4 text-sm text-slate-500">
-                              Chọn từ 2 đến 6 tag bạn đang có để hiện combo hợp lệ và operator phù hợp.
-                            </div>
-                          ) : (
-                            <>
-                              <div className="bg-white rounded-xl border border-slate-100 p-4">
-                                <div className="flex items-center justify-between gap-3 mb-4">
-                                  <p className="font-bold text-slate-800">
-                                    Tất cả combo hợp lệ
-                                  </p>
-                                  <Badge
-                                    variant="outline"
-                                    className="bg-white border-slate-200 text-slate-600"
-                                  >
-                                    {recruitmentComboResults.length} combo
-                                  </Badge>
-                                </div>
-                                {recruitmentComboResults.length > 0 ? (
-                                  <div className="space-y-2">
-                                    {recruitmentComboResults.map((combo) => (
-                                      <div
-                                        key={combo.tags.join("|")}
-                                        className="rounded-xl border border-slate-100 bg-slate-50/70 p-3"
-                                      >
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          {combo.tags.map((tag) => (
-                                            <span
-                                              key={`${combo.tags.join("|")}-${tag}`}
-                                              className={`${getRecruitmentTagClassName(tag, {
-                                                active: true,
-                                              })} px-2 py-1 text-[11px] font-semibold`}
-                                            >
-                                              {tag}
-                                            </span>
-                                          ))}
-                                          {combo.isSpecial ? (
-                                            <span className="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">
-                                              Khuyên chọn
-                                            </span>
-                                          ) : null}
-                                        </div>
-                                        <p className="mt-2 text-sm text-slate-700">
-                                          {combo.recommendation}.
-                                        </p>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                          {combo.operators.map((operator) => (
-                                            <div
-                                              key={`${combo.tags.join("|")}-${operator.name}`}
-                                              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2"
-                                            >
-                                              <div className="size-10 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shrink-0">
-                                                <img
-                                                  src={getOperatorAvatarUrl(operator.name)}
-                                                  alt={operator.name}
-                                                  className="h-full w-full object-cover"
-                                                  onError={(e) => {
-                                                    e.currentTarget.style.display = "none";
-                                                  }}
-                                                />
-                                              </div>
-                                              <div className="min-w-0">
-                                                <p className="text-sm font-bold leading-tight text-slate-900">
-                                                  {operator.name}
-                                                </p>
-                                                <div className="mt-1 flex items-center gap-0.5">
-                                                  {Array.from({ length: operator.rarity }).map(
-                                                    (_, index) => (
-                                                      <Star
-                                                        key={`${combo.tags.join("|")}-${operator.name}-star-${index}`}
-                                                        className="h-3 w-3 fill-amber-500 text-amber-500"
-                                                      />
-                                                    ),
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-sm text-slate-500">
-                                    Chưa có combo hợp lệ. Chọn thêm tag để hệ thống gợi ý.
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                </Card>
+                <ToolsTabContent
+                  initialToolsTab={initialToolsTab}
+                  renderStandaloneToolPage={renderStandaloneToolPage}
+                  pullPlannerProps={{
+                    TOOL_ICON_URLS,
+                    getPlannerResourceCardClassName,
+                    getPlannerSourceCardClassName,
+                    handlePullPlannerChange,
+                    plannerCurrentLeftoverOrundum,
+                    plannerIntelligenceCertificates,
+                    plannerIntelligenceOrundum,
+                    plannerCurrentOrundum,
+                    plannerCurrentPulls,
+                    plannerDaysUntilBanner,
+                    plannerMonthsUntilBanner,
+                    plannerOrundum,
+                    plannerPermits,
+                    plannerPrime,
+                    plannerProjectedBannerLeftoverOrundum,
+                    plannerProjectedBannerPulls,
+                    plannerProjectedTransferableLeftoverOrundum,
+                    plannerProjectedTransferablePulls,
+                    plannerReachableShopMonths,
+                    plannerShardOrundum,
+                    plannerShards,
+                    plannerStableBreakdown,
+                    plannerAnnihilationUndoneMaps,
+                    plannerTargetOnlyPulls,
+                    plannerWeeksUntilBanner,
+                    pullPlanner,
+                    pullPlannerTargets,
+                    selectedPullPlannerTarget,
+                  }}
+                  sanityProps={{
+                    currentSanity,
+                    currentSanityInput,
+                    formatRecoveryDateTime,
+                    formatRecoveryDuration,
+                    hydrateSanityFromInput,
+                    missingSanity,
+                    recoveryMinutes,
+                    sanityCap,
+                    userInfo,
+                  }}
+                  recruitmentProps={{
+                    RECRUITMENT_SPECIAL_TAGS,
+                    RECRUITMENT_TAG_GROUPS,
+                    getOperatorAvatarUrl,
+                    getRecruitmentTagClassName,
+                    handleToggleRecruitmentTag,
+                    normalizedRecruitmentTargetInput,
+                    recruitmentComboResults,
+                    recruitmentTagButtonRefs,
+                    recruitmentTargetInput,
+                    recruitmentTargetSuggestions,
+                    selectedRecruitmentTags,
+                    selectedRecruitmentTargetOperator,
+                    setRecruitmentTargetInput,
+                    setSelectedRecruitmentTags,
+                  }}
+                />
               </TabsContent>
 
-              <TabsContent
-                value="characters"
-                className="mt-0 focus-visible:outline-none space-y-6"
-              >
-                <Card className="glass-card border-0 shadow-sm overflow-hidden">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500" />
-                  <CardHeader className="pb-4 bg-white/30 border-b border-slate-100">
-                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
-                      <div className="p-2 bg-emerald-100 rounded-lg border border-emerald-200">
-                        <Users className="w-6 h-6 text-emerald-600" />
-                      </div>
-                      Characters
-                    </CardTitle>
-                    <CardDescription className="text-slate-500 text-base">
-                      Theo dõi danh sách operator, ngày ra mắt Global và lọc nhanh
-                      theo tên hoặc độ hiếm.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
-                    <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-                      <div className="flex flex-col md:flex-row gap-3 flex-1 max-w-3xl">
-                        <div className="relative flex-1 max-w-xl">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="h-5 w-5 text-slate-400" />
-                          </div>
-                          <Input
-                            placeholder="Tìm theo tên"
-                            value={operatorSearch}
-                            onChange={(e) => setOperatorSearch(e.target.value)}
-                            className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-emerald-400 focus:ring-emerald-400/20 pl-10 h-12 text-base rounded-xl"
-                          />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {["all", "6", "5", "4", "3", "2", "1"].map((starValue) => (
-                            <Button
-                              key={starValue}
-                              type="button"
-                              variant={operatorStarFilter === starValue ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setOperatorStarFilter(starValue)}
-                              className={
-                                operatorStarFilter === starValue
-                                  ? "bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg"
-                                  : "rounded-lg border-slate-200 text-slate-600"
-                              }
-                            >
-                              {starValue === "all" ? "Tất cả" : `${starValue}★`}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-slate-500 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className="bg-white border-slate-200 text-slate-600"
-                        >
-                          {filteredOperators.length} character
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className="bg-white border-slate-200 text-slate-600"
-                        >
-                          Trang {operatorPage}/{operatorTotalPages}
-                        </Badge>
-                      </div>
-                    </div>
+              <CharactersTabContent
+                filteredOperators={filteredOperators}
+                formatDisplayDate={formatDisplayDate}
+                getOperatorRarityValue={getOperatorRarityValue}
+                getWikiImageName={getWikiImageName}
+                isOperatorLoading={isOperatorLoading}
+                operatorError={operatorError}
+                operatorPage={operatorPage}
+                operatorSearch={operatorSearch}
+                operatorStarFilter={operatorStarFilter}
+                operatorTotalPages={operatorTotalPages}
+                paginatedOperators={paginatedOperators}
+                setOperatorPage={setOperatorPage}
+                setOperatorSearch={setOperatorSearch}
+                setOperatorStarFilter={setOperatorStarFilter}
+              />
 
-                    {isOperatorLoading ? (
-                      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                        <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
-                        <p className="text-slate-500 font-medium">
-                          Đang tải danh sách character...
-                        </p>
-                      </div>
-                    ) : operatorError ? (
-                      <Alert className="border-red-200 bg-red-50 text-red-800 rounded-xl">
-                        <AlertCircle className="h-5 w-5 text-red-500" />
-                        <AlertDescription className="ml-2 font-medium text-base">
-                          {operatorError}
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                          {paginatedOperators.map((operator) => {
-                            const rarity = getOperatorRarityValue(operator) ?? 0;
-                            const isSixStar = rarity === 6;
-                            const isFiveStar = rarity === 5;
-                            const isReleased = operator.globalReleased;
-                            const globalReleaseLabel = formatDisplayDate(
-                              operator.enReleaseDate ?? operator.releaseDate,
-                            );
+              <BannersTabContent
+                bannerError={bannerError}
+                bannerPage={bannerPage}
+                bannerPredictionDetailsByKey={bannerPredictionDetailsByKey}
+                bannerSearch={bannerSearch}
+                bannerTotalPages={bannerTotalPages}
+                earliestReleasedBannerDateByOperator={earliestReleasedBannerDateByOperator}
+                filteredBanners={filteredBanners}
+                formatDisplayDate={formatDisplayDate}
+                getBannerKey={getBannerKey}
+                getNormalizedBannerOperatorNames={getNormalizedBannerOperatorNames}
+                getWikiImageName={getWikiImageName}
+                isBannerLimited={isBannerLimited}
+                isBannerLoading={isBannerLoading}
+                paginatedBanners={paginatedBanners}
+                setBannerPage={setBannerPage}
+                setBannerSearch={setBannerSearch}
+                upcomingNewOperatorsByBanner={upcomingNewOperatorsByBanner}
+              />
 
-                            return (
-                              <Card
-                                key={`${operator.name}-${operator.releaseDate}`}
-                                className="border border-slate-200 bg-white/80 shadow-sm hover:shadow-md transition-all overflow-hidden"
-                                title={operator.event}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex items-start justify-between gap-2 mb-3">
-                                    <Badge
-                                      className={
-                                        isReleased
-                                          ? "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                          : "bg-cyan-100 text-cyan-700 border-cyan-200 hover:bg-cyan-100"
-                                      }
-                                    >
-                                      {isReleased
-                                        ? globalReleaseLabel ?? "Đã ra"
-                                        : "Chưa ra"}
-                                    </Badge>
-                                    <Badge
-                                      variant="outline"
-                                      className={
-                                        operator.limited
-                                          ? "bg-rose-100 text-rose-700 border-rose-200"
-                                          : "bg-slate-50 border-slate-200 text-slate-500"
-                                      }
-                                    >
-                                      {operator.limited ? "Limited" : "Thường"}
-                                    </Badge>
-                                  </div>
+              <TierListTabContent
+                getTierBadgeClassName={getTierBadgeClassName}
+                handleAddTier={handleAddTier}
+                handleAssignOperatorToTier={handleAssignOperatorToTier}
+                handleDeleteSavedTierList={handleDeleteSavedTierList}
+                handleDeleteTier={handleDeleteTier}
+                handleLoadSavedTierListToEditor={handleLoadSavedTierListToEditor}
+                handleMoveTier={handleMoveTier}
+                handleOpenSavedTierList={handleOpenSavedTierList}
+                handleSaveTierList={handleSaveTierList}
+                newTierName={newTierName}
+                paginatedTierPoolCandidates={paginatedTierPoolCandidates}
+                savedTierLists={savedTierLists}
+                selectedTierBoard={selectedTierBoard}
+                selectedTierList={selectedTierList}
+                setNewTierName={setNewTierName}
+                setTierAssignments={setTierAssignments}
+                setTierListName={setTierListName}
+                setTierListView={setTierListView}
+                setTierPoolPage={setTierPoolPage}
+                setTierSearch={setTierSearch}
+                setTierStarFilter={setTierStarFilter}
+                tierAssignments={tierAssignments}
+                tierBoard={tierBoard}
+                tierListName={tierListName}
+                tierListView={tierListView}
+                tierOrder={tierOrder}
+                tierPoolPage={tierPoolPage}
+                tierPoolTotalPages={tierPoolTotalPages}
+                tierSearch={tierSearch}
+                tierStarFilter={tierStarFilter}
+                unassignedOperatorCount={unassignedOperatorCount}
+                unassignedTierCandidates={unassignedTierCandidates}
+                TierAssignmentAvatar={TierAssignmentAvatar}
+                TierOperatorAvatar={TierOperatorAvatar}
+              />
 
-                                  <div className="flex flex-col items-center text-center">
-                                    <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-200 border border-slate-100 shadow-sm mb-3">
-                                      <img
-                                        src={`https://arknights.wiki.gg/images/${getWikiImageName(operator.name)}_icon.png`}
-                                        alt={operator.name}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = "none";
-                                        }}
-                                      />
-                                    </div>
+              <NewsTabContent
+                isNewsLoading={isNewsLoading}
+                newsData={newsData}
+                translateGameTerms={translateGameTerms}
+              />
 
-                                    <p className="font-bold text-slate-800 leading-tight min-h-[2.5rem] flex items-center">
-                                      {operator.name}
-                                    </p>
-
-                                    <div className="flex items-center gap-0.5 mt-2 mb-3">
-                                      {Array.from({
-                                        length: Number.isFinite(rarity)
-                                          ? rarity
-                                          : 0,
-                                      }).map((_, starIndex) => (
-                                        <Star
-                                          key={starIndex}
-                                          className={`w-3.5 h-3.5 ${
-                                            isSixStar
-                                              ? "fill-orange-500 text-orange-500"
-                                              : isFiveStar
-                                                ? "fill-yellow-500 text-yellow-500"
-                                                : "fill-slate-400 text-slate-400"
-                                          }`}
-                                        />
-                                      ))}
-                                    </div>
-
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                        {filteredOperators.length > 0 && (
-                          <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={operatorPage <= 1}
-                              onClick={() => setOperatorPage(1)}
-                              className="rounded-lg"
-                            >
-                              «
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={operatorPage <= 1}
-                              onClick={() =>
-                                setOperatorPage((page) => Math.max(1, page - 1))
-                              }
-                              className="rounded-lg"
-                            >
-                              ‹
-                            </Button>
-                            <Badge
-                              variant="outline"
-                              className="bg-white border-slate-200 text-slate-600 px-3 py-1.5"
-                            >
-                              Trang {operatorPage} / {operatorTotalPages}
-                            </Badge>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={operatorPage >= operatorTotalPages}
-                              onClick={() =>
-                                setOperatorPage((page) =>
-                                  Math.min(operatorTotalPages, page + 1),
-                                )
-                              }
-                              className="rounded-lg"
-                            >
-                              ›
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={operatorPage >= operatorTotalPages}
-                              onClick={() => setOperatorPage(operatorTotalPages)}
-                              className="rounded-lg"
-                            >
-                              »
-                            </Button>
-                          </div>
-                        )}
-                        {filteredOperators.length === 0 && (
-                          <div className="p-8 text-center text-slate-500">
-                            Không có character nào khớp với từ khóa tìm kiếm.
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent
-                value="banners"
-                className="mt-0 focus-visible:outline-none space-y-6"
-              >
-                <Card className="glass-card border-0 shadow-sm overflow-hidden">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500" />
-                  <CardHeader className="pb-4 bg-white/30 border-b border-slate-100">
-                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
-                      <div className="p-2 bg-sky-100 rounded-lg border border-sky-200">
-                        <GalleryHorizontal className="w-6 h-6 text-sky-600" />
-                      </div>
-                      Banners
-                    </CardTitle>
-                    <CardDescription className="text-slate-500 text-base">
-                      Xem banner đã ra và sắp ra, kèm character xuất hiện trong
-                      từng banner để tra cứu nhanh.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
-                    <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-                      <div className="relative flex-1 max-w-xl">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Search className="h-5 w-5 text-slate-400" />
-                        </div>
-                        <Input
-                          placeholder="Tìm theo tên banner, category hoặc character"
-                          value={bannerSearch}
-                          onChange={(e) => setBannerSearch(e.target.value)}
-                          className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-sky-400 focus:ring-sky-400/20 pl-10 h-12 text-base rounded-xl"
-                        />
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-slate-500 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className="bg-white border-slate-200 text-slate-600"
-                        >
-                          {filteredBanners.length} banner
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className="bg-white border-slate-200 text-slate-600"
-                        >
-                          Trang {bannerPage}/{bannerTotalPages}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {isBannerLoading ? (
-                      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                        <Loader2 className="w-10 h-10 text-sky-500 animate-spin" />
-                        <p className="text-slate-500 font-medium">
-                          Đang tải danh sách banner...
-                        </p>
-                      </div>
-                    ) : bannerError ? (
-                      <Alert className="border-red-200 bg-red-50 text-red-800 rounded-xl">
-                        <AlertCircle className="h-5 w-5 text-red-500" />
-                        <AlertDescription className="ml-2 font-medium text-base">
-                          {bannerError}
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {paginatedBanners.map((banner) => {
-                            const isReleased = Boolean(banner.enStartDate);
-                            const bannerIsLimited = isBannerLimited(banner);
-                            const visibleBannerOperators =
-                              getNormalizedBannerOperatorNames(banner);
-                            const predictionDetails =
-                              bannerPredictionDetailsByKey.get(getBannerKey(banner)) ??
-                              null;
-                            const estimatedReleaseDate =
-                              !isReleased ? predictionDetails?.date ?? null : null;
-
-                            return (
-                              <Card
-                                key={`${banner.name}-${banner.releaseDate}`}
-                                className="border border-slate-200 bg-white/80 shadow-sm hover:shadow-md transition-all overflow-hidden"
-                                title={banner.name}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex items-start justify-between gap-2 mb-3">
-                                    <Badge
-                                      className={
-                                        isReleased
-                                          ? "bg-sky-100 text-sky-700 border-sky-200 hover:bg-sky-100"
-                                          : "bg-cyan-100 text-cyan-700 border-cyan-200 hover:bg-cyan-100"
-                                      }
-                                    >
-                                      {isReleased
-                                        ? formatDisplayDate(banner.enStartDate) ?? "Đã ra"
-                                        : "Chưa ra"}
-                                    </Badge>
-                                    <Badge
-                                      variant="outline"
-                                      className={
-                                        bannerIsLimited
-                                          ? "bg-rose-100 text-rose-700 border-rose-200"
-                                          : "bg-slate-50 border-slate-200 text-slate-500"
-                                      }
-                                    >
-                                      {bannerIsLimited ? "Limited" : banner.category}
-                                    </Badge>
-                                  </div>
-
-                                  <div className="flex flex-col items-center text-center">
-                                    <p className="font-bold text-slate-800 leading-tight text-base min-h-[3rem] flex items-center justify-center">
-                                      {banner.name}
-                                    </p>
-
-                                    <div className="w-full mb-3">
-                                      {banner.bannerImageUrl ? (
-                                        <div className="rounded-2xl overflow-hidden border border-sky-200 shadow-sm bg-slate-100">
-                                          <img
-                                            src={banner.bannerImageUrl}
-                                            alt={banner.name}
-                                            className="w-full aspect-[16/9] object-cover"
-                                            onError={(e) => {
-                                              e.currentTarget.style.display =
-                                                "none";
-                                            }}
-                                          />
-                                        </div>
-                                      ) : visibleBannerOperators.length > 0 ? (
-                                        <div className="grid grid-cols-3 gap-2">
-                                          {visibleBannerOperators.map((operatorName) => (
-                                              <div
-                                                key={`${banner.name}-${operatorName}`}
-                                                className="w-14 h-14 mx-auto rounded-2xl overflow-hidden bg-slate-200 border-2 border-white shadow-sm"
-                                              >
-                                                <img
-                                                  src={`https://arknights.wiki.gg/images/${getWikiImageName(operatorName)}_icon.png`}
-                                                  alt={operatorName}
-                                                  className="w-full h-full object-cover"
-                                                  onError={(e) => {
-                                                    e.currentTarget.style.display =
-                                                      "none";
-                                                  }}
-                                                />
-                                              </div>
-                                            ))}
-                                        </div>
-                                      ) : (
-                                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-sky-100 to-indigo-100 border border-sky-200 shadow-sm mx-auto flex items-center justify-center">
-                                          <GalleryHorizontal className="w-9 h-9 text-sky-600" />
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <p className="font-bold text-slate-800 leading-tight min-h-[3rem] flex items-center">
-                                      {visibleBannerOperators.length} character
-                                    </p>
-
-                                    {visibleBannerOperators.length > 0 && (
-                                      <div className="w-full mt-3 grid grid-cols-2 gap-2">
-                                        {visibleBannerOperators.map((operatorName) => (
-                                          (() => {
-                                            const isNewOperator = banner.enStartDate
-                                              ? earliestReleasedBannerDateByOperator.get(
-                                                  operatorName,
-                                                ) === banner.enStartDate
-                                              : upcomingNewOperatorsByBanner
-                                                  .get(getBannerKey(banner))
-                                                  ?.has(operatorName) ?? false;
-
-                                            return (
-                                          <div
-                                            key={`${banner.name}-list-${operatorName}`}
-                                            className="flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2 py-1.5"
-                                          >
-                                            <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-200 flex-shrink-0">
-                                              <img
-                                                src={`https://arknights.wiki.gg/images/${getWikiImageName(operatorName)}_icon.png`}
-                                                alt={operatorName}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                  e.currentTarget.style.display =
-                                                    "none";
-                                                }}
-                                              />
-                                            </div>
-                                            <div className="min-w-0 flex-1 text-left">
-                                              <span className="text-[11px] text-slate-600 leading-tight line-clamp-2 block">
-                                                {operatorName}
-                                              </span>
-                                              {isNewOperator && (
-                                                <span className="text-[10px] font-bold text-emerald-600">
-                                                  NEW
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                            );
-                                          })()
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {!isReleased && estimatedReleaseDate && (
-                                      <>
-                                        <p className="text-[11px] text-amber-600 mt-2 font-medium">
-                                          Dự đoán: {formatDisplayDate(estimatedReleaseDate)}
-                                        </p>
-                                        {predictionDetails && (
-                                          <p className="text-[10px] text-slate-500 mt-1">
-                                            Dựa trên {predictionDetails.sampleSize} banner{" "}
-                                            {predictionDetails.reason}.
-                                          </p>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                        {filteredBanners.length > 0 && (
-                          <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={bannerPage <= 1}
-                              onClick={() => setBannerPage(1)}
-                              className="rounded-lg"
-                            >
-                              «
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={bannerPage <= 1}
-                              onClick={() =>
-                                setBannerPage((page) => Math.max(1, page - 1))
-                              }
-                              className="rounded-lg"
-                            >
-                              ‹
-                            </Button>
-                            <Badge
-                              variant="outline"
-                              className="bg-white border-slate-200 text-slate-600 px-3 py-1.5"
-                            >
-                              Trang {bannerPage} / {bannerTotalPages}
-                            </Badge>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={bannerPage >= bannerTotalPages}
-                              onClick={() =>
-                                setBannerPage((page) =>
-                                  Math.min(bannerTotalPages, page + 1),
-                                )
-                              }
-                              className="rounded-lg"
-                            >
-                              ›
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={bannerPage >= bannerTotalPages}
-                              onClick={() => setBannerPage(bannerTotalPages)}
-                              className="rounded-lg"
-                            >
-                              »
-                            </Button>
-                          </div>
-                        )}
-                        {filteredBanners.length === 0 && (
-                          <div className="p-8 text-center text-slate-500">
-                            Không có banner nào khớp với từ khóa tìm kiếm.
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent
-                value="tierlist"
-                className="mt-0 focus-visible:outline-none space-y-6"
-              >
-                <Card className="glass-card border-0 shadow-sm overflow-hidden">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-rose-400 via-orange-500 to-amber-400" />
-                  <CardHeader className="pb-4 bg-white/30 border-b border-slate-100">
-                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
-                      <div className="p-2 bg-rose-100 rounded-lg border border-rose-200">
-                        <Trophy className="w-6 h-6 text-rose-600" />
-                      </div>
-                      Tier List
-                    </CardTitle>
-                    <CardDescription className="text-slate-500 text-base">
-                      Xem tier list mặc định, tạo tier list riêng và sắp xếp operator
-                      theo cách đánh giá của bạn.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-6">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant={tierListView === "browse" ? "default" : "outline"}
-                        onClick={() => setTierListView("browse")}
-                        className={
-                          tierListView === "browse"
-                            ? "bg-rose-500 hover:bg-rose-600 text-white rounded-xl"
-                            : "rounded-xl border-slate-200 text-slate-600"
-                        }
-                      >
-                        Xem tier list
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={tierListView === "create" ? "default" : "outline"}
-                        onClick={() => setTierListView("create")}
-                        className={
-                          tierListView === "create"
-                            ? "bg-rose-500 hover:bg-rose-600 text-white rounded-xl"
-                            : "rounded-xl border-slate-200 text-slate-600"
-                        }
-                      >
-                        Tự tạo
-                      </Button>
-                    </div>
-
-                    {tierListView === "browse" ? (
-                      <div className="space-y-4">
-                        {savedTierLists.length > 0 ? (
-                          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                            {savedTierLists.map((tierList) => (
-                              <button
-                                key={tierList.id}
-                                type="button"
-                                onClick={() => handleOpenSavedTierList(tierList)}
-                                className={`w-full text-left rounded-2xl border p-4 transition-all ${
-                                  selectedTierList?.id === tierList.id
-                                    ? "border-rose-300 bg-rose-50/80 shadow-sm"
-                                    : "border-slate-200 bg-white/80"
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <p className="font-semibold text-slate-800 truncate">
-                                      {tierList.name}
-                                    </p>
-                                    <p className="text-xs text-slate-400 mt-1">
-                                      {new Date(tierList.createdAt).toLocaleDateString("vi-VN")}
-                                    </p>
-                                  </div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-6 text-sm text-slate-500">
-                            Chưa có tier list nào để xem.
-                          </div>
-                        )}
-
-                        <div className="space-y-3">
-                          {selectedTierList ? (
-                            <>
-                              <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                                <p className="text-lg font-bold text-slate-800">
-                                  {selectedTierList.name}
-                                </p>
-                              </div>
-                              {selectedTierBoard.map(({ tier, operators }) => (
-                                <div
-                                  key={`selected-tier-board-${tier}`}
-                                  className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm overflow-hidden"
-                                >
-                                  <div className="flex items-center gap-3 p-4 border-b border-slate-100">
-                                    <Badge className={getTierBadgeClassName(tier)}>
-                                      {tier}
-                                    </Badge>
-                                    <span className="text-sm text-slate-500">
-                                      {operators.length} character
-                                    </span>
-                                  </div>
-                                  {operators.length > 0 ? (
-                                    <div className="flex flex-wrap gap-3 p-4">
-                                      {operators.map((operator) => (
-                                        <TierOperatorAvatar
-                                          key={`selected-tier-card-${tier}-${operator.name}`}
-                                          operator={operator}
-                                        />
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="p-4 text-sm text-slate-400">
-                                      Chưa có character trong tier này.
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </>
-                          ) : (
-                            <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-6 text-sm text-slate-500">
-                              Chọn một tier list ở trên để xem.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                          <div className="mb-3">
-                            <p className="text-sm font-semibold text-slate-800">
-                              Tierlist đã tạo
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              Chọn để sửa, xem hoặc xóa.
-                            </p>
-                          </div>
-                          {savedTierLists.length > 0 ? (
-                            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                              {savedTierLists.map((tierList) => (
-                                <div
-                                  key={`create-tier-list-${tierList.id}`}
-                                  className="rounded-2xl border border-slate-200 bg-white p-4"
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <p className="truncate font-semibold text-slate-800">
-                                        {tierList.name}
-                                      </p>
-                                      <p className="mt-1 text-xs text-slate-400">
-                                        {new Date(tierList.createdAt).toLocaleDateString("vi-VN")}
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleOpenSavedTierList(tierList)}
-                                        className="rounded-lg border-slate-200 text-slate-600"
-                                      >
-                                        Xem
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleLoadSavedTierListToEditor(tierList)}
-                                        className="rounded-lg border-slate-200 text-slate-600"
-                                      >
-                                        Sửa
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleDeleteSavedTierList(tierList.id)}
-                                        className="rounded-lg border-red-200 text-red-600"
-                                      >
-                                        Xóa
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-400">
-                              Chưa có tierlist nào đã lưu.
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col xl:flex-row gap-3">
-                          <Input
-                            placeholder="Đặt tên tier list"
-                            value={tierListName}
-                            onChange={(e) => setTierListName(e.target.value)}
-                            className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:ring-rose-400/20 h-12 text-base rounded-xl xl:max-w-[320px]"
-                          />
-                          <Input
-                            placeholder="Tạo tier mới, ví dụ SS hoặc Meme"
-                            value={newTierName}
-                            onChange={(e) => setNewTierName(e.target.value)}
-                            className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:ring-rose-400/20 h-12 text-base rounded-xl xl:max-w-[320px]"
-                          />
-                          <Button
-                            type="button"
-                            onClick={handleAddTier}
-                            className="rounded-xl bg-slate-900 text-white hover:bg-slate-800"
-                          >
-                            <Plus className="size-4" />
-                            Thêm tier
-                          </Button>
-                        </div>
-
-                        <div className="flex flex-col xl:flex-row gap-3">
-                          <div className="relative flex-1">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                              <Search className="h-5 w-5 text-slate-400" />
-                            </div>
-                            <Input
-                              placeholder="Tìm character để xếp tier"
-                              value={tierSearch}
-                              onChange={(e) => setTierSearch(e.target.value)}
-                              className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:ring-rose-400/20 pl-10 h-12 text-base rounded-xl"
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            onClick={handleSaveTierList}
-                            className="bg-rose-500 hover:bg-rose-600 text-white rounded-xl"
-                          >
-                            Lưu tier list
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setTierAssignments({})}
-                            className="rounded-xl border-slate-200 text-slate-600"
-                          >
-                            Xóa xếp hạng
-                          </Button>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {tierOrder.map((tier, tierIndex) => (
-                            <div
-                              key={`tier-config-${tier}`}
-                              className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-1.5"
-                            >
-                              <Badge className={getTierBadgeClassName(tier)}>{tier}</Badge>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => handleMoveTier(tierIndex, -1)}
-                                disabled={tierIndex === 0}
-                                className="rounded-full text-slate-500"
-                                aria-label={`Đưa ${tier} lên trên`}
-                              >
-                                <ChevronUp className="size-4" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => handleMoveTier(tierIndex, 1)}
-                                disabled={tierIndex === tierOrder.length - 1}
-                                className="rounded-full text-slate-500"
-                                aria-label={`Đưa ${tier} xuống dưới`}
-                              >
-                                <ChevronDown className="size-4" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => handleDeleteTier(tier)}
-                                disabled={tierOrder.length <= 1}
-                                className="rounded-full text-rose-500 hover:text-rose-600"
-                                aria-label={`Xóa tier ${tier}`}
-                              >
-                                <X className="size-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm">
-                          <div className="mb-3 flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-slate-800">
-                                Pool character
-                              </p>
-                              <p className="text-xs text-slate-400">
-                                Bấm avatar để chọn tier ngay tại chỗ.
-                              </p>
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className="rounded-full border-slate-200 text-slate-500"
-                            >
-                              {unassignedOperatorCount} chưa xếp
-                            </Badge>
-                          </div>
-                          <div className="mb-3 flex flex-wrap gap-2">
-                            {["all", "6", "5", "4", "3", "2", "1"].map((starValue) => (
-                              <Button
-                                key={`tier-star-filter-${starValue}`}
-                                type="button"
-                                variant={
-                                  tierStarFilter === starValue ? "default" : "outline"
-                                }
-                                size="sm"
-                                onClick={() => setTierStarFilter(starValue)}
-                                className={
-                                  tierStarFilter === starValue
-                                    ? "bg-rose-500 hover:bg-rose-600 text-white rounded-lg"
-                                    : "rounded-lg border-slate-200 text-slate-600"
-                                }
-                              >
-                                {starValue === "all" ? "Tất cả" : `${starValue}★`}
-                              </Button>
-                            ))}
-                          </div>
-                          {unassignedTierCandidates.length > 0 ? (
-                            <>
-                              <div className="grid grid-cols-5 gap-3 sm:grid-cols-6 md:grid-cols-8 xl:grid-cols-10">
-                                {paginatedTierPoolCandidates.map((operator) => (
-                                  <TierAssignmentAvatar
-                                    key={`tier-editor-${operator.name}`}
-                                    currentTier=""
-                                    onAssign={(tier) =>
-                                      handleAssignOperatorToTier(operator.name, tier)
-                                    }
-                                    operator={operator}
-                                    tierOrder={tierOrder}
-                                  />
-                                ))}
-                              </div>
-                              {tierPoolTotalPages > 1 ? (
-                                <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={tierPoolPage <= 1}
-                                    onClick={() => setTierPoolPage(1)}
-                                    className="rounded-lg"
-                                  >
-                                    «
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={tierPoolPage <= 1}
-                                    onClick={() =>
-                                      setTierPoolPage((page) => Math.max(1, page - 1))
-                                    }
-                                    className="rounded-lg"
-                                  >
-                                    ‹
-                                  </Button>
-                                  <Badge
-                                    variant="outline"
-                                    className="bg-white border-slate-200 text-slate-600 px-3 py-1.5"
-                                  >
-                                    Trang {tierPoolPage} / {tierPoolTotalPages}
-                                  </Badge>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={tierPoolPage >= tierPoolTotalPages}
-                                    onClick={() =>
-                                      setTierPoolPage((page) =>
-                                        Math.min(tierPoolTotalPages, page + 1),
-                                      )
-                                    }
-                                    className="rounded-lg"
-                                  >
-                                    ›
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={tierPoolPage >= tierPoolTotalPages}
-                                    onClick={() => setTierPoolPage(tierPoolTotalPages)}
-                                    className="rounded-lg"
-                                  >
-                                    »
-                                  </Button>
-                                </div>
-                              ) : null}
-                            </>
-                          ) : (
-                            <div className="py-4 text-sm text-slate-400">
-                              Không còn character nào chưa xếp hạng.
-                            </div>
-                          )}
-                        </div>
-
-                        {tierBoard.map(({ tier, operators }) => (
-                          <div
-                            key={`tier-board-${tier}`}
-                            className="rounded-2xl border border-slate-200 bg-white/80 shadow-sm overflow-hidden"
-                          >
-                            <div className="flex items-center gap-3 border-b border-slate-100 p-4">
-                              <Badge className={getTierBadgeClassName(tier)}>{tier}</Badge>
-                              <span className="text-sm text-slate-500">
-                                {operators.length} character
-                              </span>
-                            </div>
-                            {operators.length > 0 ? (
-                              <div className="flex flex-wrap gap-3 p-4">
-                                {operators.map((operator) => (
-                                  <TierAssignmentAvatar
-                                    key={`tier-card-${tier}-${operator.name}`}
-                                    currentTier={tier}
-                                    onAssign={(nextTier) =>
-                                      handleAssignOperatorToTier(operator.name, nextTier)
-                                    }
-                                    operator={operator}
-                                    tierOrder={tierOrder}
-                                  />
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="p-4 text-sm text-slate-400">
-                                Chưa có character trong tier này.
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Game Events Tab */}
-              <TabsContent
-                value="events"
-                className="mt-0 focus-visible:outline-none pb-28"
-              >
-                <Card className="glass-card border-0 shadow-sm overflow-hidden mb-4">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-cyan-400 to-blue-500" />
-                  <CardHeader className="pb-4 bg-white/30 border-b border-slate-100">
-                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
-                      <div className="p-2 bg-cyan-100 rounded-lg border border-cyan-200">
-                        <Gamepad2 className="w-6 h-6 text-cyan-600" />
-                      </div>
-                      Tin tức
-                    </CardTitle>
-                    <CardDescription className="text-slate-500 text-base">
-                      Theo dõi thông báo mới từ Yostar, nội dung event, banner,
-                      outfit và pack đang mở trong game.
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-                <div className="grid grid-cols-1 gap-4">
-                  {newsData.map((news, idx) => {
-                    return (
-                      <Card
-                        key={news.id}
-                        className="glass-card border-0 overflow-hidden group shadow-sm hover:shadow-md"
-                        style={{ animationDelay: `${idx * 0.1}s` }}
-                      >
-                        <div className="h-1.5 w-full bg-gradient-to-r from-cyan-400 to-blue-500" />
-                        <CardHeader className="pb-3 border-b border-slate-100/50">
-                          <div className="flex justify-between items-start">
-                            <CardTitle className="text-slate-800 text-xl font-bold mb-1 group-hover:text-cyan-600 transition-colors leading-tight">
-                              {translateGameTerms(news.title)}
-                            </CardTitle>
-                            <Badge
-                              variant="outline"
-                              className="bg-white/50 border-slate-200 text-slate-600 font-medium whitespace-nowrap ml-4"
-                            >
-                              <Clock className="w-3 h-3 mr-1.5 text-slate-400" />
-                              {new Date(news.publishTime).toLocaleDateString(
-                                "vi-VN",
-                              )}
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-5">
-                          <div
-                            className="prose prose-sm max-w-none text-slate-600 prose-a:text-cyan-600 prose-img:rounded-xl mb-6 overflow-hidden"
-                            dangerouslySetInnerHTML={{
-                              __html: translateGameTerms(news.content),
-                            }}
-                          />
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-
-                {isNewsLoading && (
-                  <div className="flex justify-center p-8">
-                    <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Gacha Tab */}
-              <TabsContent
-                value="gacha"
-                className="mt-0 focus-visible:outline-none space-y-6"
-              >
-                <Card className="glass-card border-0 shadow-sm">
-                  <CardHeader className="pb-4 bg-white/30 border-b border-slate-100">
-                    <CardTitle className="text-slate-800 flex items-center gap-3 text-xl">
-                      <div className="p-2 bg-amber-100 rounded-lg border border-amber-200">
-                        <Diamond className="w-6 h-6 text-amber-600" />
-                      </div>
-                      Tra cứu lịch sử gacha
-                    </CardTitle>
-                    <CardDescription className="text-slate-500">
-                      Kiểm tra lịch sử roll, lọc banner và theo dõi pity từ dữ
-                      liệu gacha của tài khoản. Dán cookie lấy từ{" "}
-                      <a
-                        href="https://account.yo-star.com/login"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-cyan-600 hover:text-cyan-700 underline underline-offset-2"
-                      >
-                        https://account.yo-star.com/login
-                      </a>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col md:flex-row gap-3 mb-4">
-                      <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Search className="h-5 w-5 text-slate-400" />
-                        </div>
-                        <Input
-                          placeholder="Nhập cookie hoặc token của bạn"
-                          value={cookieToken}
-                          onChange={(e) => setCookieToken(e.target.value)}
-                          onKeyPress={handleGachaKeyPress}
-                          className="bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-amber-400 focus:ring-amber-400/20 pl-10 h-12 text-lg rounded-xl"
-                        />
-                      </div>
-                      <Button
-                        onClick={() => handleSearchGacha(1)}
-                        className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white px-8 h-12 rounded-xl font-bold shadow-lg shadow-amber-500/20"
-                      >
-                        Tải lịch sử
-                      </Button>
-                    </div>
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 space-y-1">
-                      <p className="font-semibold">Cách lấy token nhanh</p>
-                      <p>1. Đăng nhập vào trang Yostar ở link bên trên.</p>
-                      <p>2. Nhấn `F12`.</p>
-                      <p>3. Chuyển sang tab `Network` hoặc `Mạng`.</p>
-                      <p>4. Nhấn `F5` để tải lại trang.</p>
-                      <p>5. Chọn request có `Name` là `detail`.</p>
-                      <p>6. Vào `Headers`, kéo xuống tìm `Cookie`, copy hết và dán vào ô nhập.</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {isGachaLoading ? (
-                  <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                    <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
-                    <p className="text-slate-500 animate-pulse font-medium">
-                      Đang tải lịch sử gacha...
-                    </p>
-                  </div>
-                ) : gachaAttempted && gachaData ? (
-                  <div className="space-y-6 animate-fade-in">
-                    {/* Pulls List */}
-                    <Card className="glass-card border-0 bg-white/80 shadow-sm overflow-hidden">
-                      <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-orange-500 to-yellow-500" />
-                      <CardHeader className="pb-4 border-b border-slate-100 bg-slate-50/50">
-                        <CardTitle className="text-slate-700 flex items-center gap-2 text-lg">
-                          <History className="w-5 h-5 text-slate-500" />
-                          Lịch sử gần đây
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-6 space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                          {[
-                            "all",
-                            "Special Headhunting",
-                            "Regular Headhunting",
-                            "Limited Headhunting",
-                          ].map((typeValue) => (
-                            <Button
-                              key={typeValue}
-                              type="button"
-                              variant={gachaTypeFilter === typeValue ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setGachaTypeFilter(typeValue)}
-                              className={
-                                gachaTypeFilter === typeValue
-                                  ? "bg-amber-500 hover:bg-amber-600 text-white rounded-lg"
-                                  : "rounded-lg border-slate-200 text-slate-600"
-                              }
-                            >
-                              {typeValue === "all" ? "Tất cả" : typeValue}
-                            </Button>
-                          ))}
-                          <Button
-                            type="button"
-                            variant={showGachaSixStarOnly ? "default" : "outline"}
-                            size="sm"
-                            onClick={() =>
-                              setShowGachaSixStarOnly((current) => !current)
-                            }
-                            className={
-                              showGachaSixStarOnly
-                                ? "bg-orange-500 hover:bg-orange-600 text-white rounded-lg"
-                                : "rounded-lg border-slate-200 text-slate-600"
-                            }
-                          >
-                            Chỉ 6★
-                          </Button>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                          {paginatedGachaData.map(({ item, pityCount, starValue, index }) => {
-                            const isSixStar = starValue === 6;
-                            const isFiveStar = starValue === 5;
-                            const isFourStar = starValue === 4;
-
-                            return (
-                              <Card
-                                key={`${item.charName}-${item.atStr}-${index}`}
-                                className="border border-slate-200 bg-white/80 shadow-sm hover:shadow-md transition-all overflow-hidden"
-                                title={item.poolName}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex flex-col items-center text-center">
-                                    <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-200 border border-slate-100 shadow-sm mb-3">
-                                      <img
-                                        src={`https://arknights.wiki.gg/images/${getWikiImageName(item.charName)}_icon.png`}
-                                        alt={item.charName}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = "none";
-                                        }}
-                                      />
-                                    </div>
-
-                                    <p
-                                      className={`font-bold leading-tight min-h-[2.5rem] flex items-center ${
-                                        isSixStar
-                                          ? "text-orange-600"
-                                          : isFiveStar
-                                            ? "text-yellow-600"
-                                            : isFourStar
-                                              ? "text-purple-600"
-                                              : "text-slate-700"
-                                      }`}
-                                    >
-                                      {item.charName}
-                                    </p>
-
-                                    <div className="flex items-center gap-0.5 mt-2 mb-3">
-                                      {Array.from({ length: starValue }).map((_, starIndex) => (
-                                        <Star
-                                          key={starIndex}
-                                          className={`w-3.5 h-3.5 ${
-                                            isSixStar
-                                              ? "fill-orange-500 text-orange-500"
-                                              : isFiveStar
-                                                ? "fill-yellow-500 text-yellow-500"
-                                                : isFourStar
-                                                  ? "fill-purple-500 text-purple-500"
-                                                  : "fill-slate-400 text-slate-400"
-                                          }`}
-                                        />
-                                      ))}
-                                    </div>
-
-                                    <Badge
-                                      variant="outline"
-                                      className="bg-slate-50 border-slate-200 text-slate-500 max-w-full"
-                                    >
-                                      <span className="truncate max-w-[140px] block">
-                                        {item.typeName}
-                                      </span>
-                                    </Badge>
-                                    {isSixStar && pityCount !== null && (
-                                      <Badge className="mt-2 bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100">
-                                        {pityCount} lần rút
-                                      </Badge>
-                                    )}
-                                    <p className="text-xs text-slate-400 mt-2">
-                                      {item.atStr}
-                                    </p>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                        {filteredGachaData.length === 0 && (
-                          <div className="p-8 text-center text-slate-500">
-                            Không tìm thấy dữ liệu gacha.
-                          </div>
-                        )}
-                        {/* Pagination */}
-                        {effectiveGachaTotalPages >= 1 && (
-                          <div className="flex flex-wrap items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 gap-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-slate-500">
-                                Trang <strong>{gachaPage}</strong> /{" "}
-                                <strong>{effectiveGachaTotalPages}</strong>
-                              </span>
-                              {!showGachaSixStarOnly && (
-                                <div className="flex items-center gap-1 ml-4">
-                                  <span className="text-xs text-slate-400">
-                                    Hiển thị:
-                                  </span>
-                                  {[10, 20, 50, 100].map((s) => (
-                                    <button
-                                      key={s}
-                                      disabled={isGachaLoading}
-                                      onClick={() => handleGachaSizeChange(s)}
-                                      className={`px-2 py-1 text-xs rounded-md font-semibold transition-colors ${
-                                        gachaPageSize === s
-                                          ? "bg-amber-500 text-white"
-                                          : "bg-slate-200 text-slate-600 hover:bg-slate-300"
-                                      }`}
-                                    >
-                                      {s}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={gachaPage <= 1 || isGachaLoading}
-                                onClick={() => handleGachaPageChange(1)}
-                                className="text-slate-600 h-8 w-8 p-0"
-                              >
-                                «
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={gachaPage <= 1 || isGachaLoading}
-                                onClick={() =>
-                                  handleGachaPageChange(gachaPage - 1)
-                                }
-                                className="text-slate-600 h-8 w-8 p-0"
-                              >
-                                ‹
-                              </Button>
-                              {Array.from(
-                                { length: Math.min(5, effectiveGachaTotalPages) },
-                                (_, i) => {
-                                  const start = Math.max(
-                                    1,
-                                    Math.min(
-                                      gachaPage - 2,
-                                      effectiveGachaTotalPages - 4,
-                                    ),
-                                  );
-                                  const p = start + i;
-                                  return (
-                                    <Button
-                                      key={p}
-                                      variant={
-                                        p === gachaPage ? "default" : "ghost"
-                                      }
-                                      size="sm"
-                                      disabled={isGachaLoading}
-                                      onClick={() => handleGachaPageChange(p)}
-                                      className={`h-8 w-8 p-0 text-sm ${
-                                        p === gachaPage
-                                          ? "bg-amber-500 text-white hover:bg-amber-600"
-                                          : "text-slate-600"
-                                      }`}
-                                    >
-                                      {p}
-                                    </Button>
-                                  );
-                                },
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={
-                                  gachaPage >= effectiveGachaTotalPages || isGachaLoading
-                                }
-                                onClick={() =>
-                                  handleGachaPageChange(gachaPage + 1)
-                                }
-                                className="text-slate-600 h-8 w-8 p-0"
-                              >
-                                ›
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={
-                                  gachaPage >= effectiveGachaTotalPages || isGachaLoading
-                                }
-                                onClick={() =>
-                                  handleGachaPageChange(effectiveGachaTotalPages)
-                                }
-                                className="text-slate-600 h-8 w-8 p-0"
-                              >
-                                »
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                ) : gachaAttempted && !gachaData && !isGachaLoading ? (
-                  <Alert className="border-red-200 bg-red-50 backdrop-blur-md text-red-800 rounded-xl animate-fade-in shadow-sm">
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                    <AlertDescription className="ml-2 font-medium text-base">
-                      {errorMessage ||
-                        "Cookie không hợp lệ hoặc đã hết hạn. Vui lòng thử lại."}
-                    </AlertDescription>
-                  </Alert>
-                ) : null}
-              </TabsContent>
+              <GachaTabContent
+                cookieToken={cookieToken}
+                effectiveGachaTotalPages={effectiveGachaTotalPages}
+                errorMessage={errorMessage}
+                filteredGachaData={filteredGachaData}
+                gachaAttempted={gachaAttempted}
+                gachaData={gachaData}
+                gachaPage={gachaPage}
+                gachaPageSize={gachaPageSize}
+                gachaTypeFilter={gachaTypeFilter}
+                getWikiImageName={getWikiImageName}
+                handleGachaKeyPress={handleGachaKeyPress}
+                handleGachaPageChange={handleGachaPageChange}
+                handleGachaSizeChange={handleGachaSizeChange}
+                handleSearchGacha={handleSearchGacha}
+                isGachaLoading={isGachaLoading}
+                paginatedGachaData={paginatedGachaData}
+                setCookieToken={setCookieToken}
+                setGachaTypeFilter={setGachaTypeFilter}
+                setShowGachaSixStarOnly={setShowGachaSixStarOnly}
+                showGachaSixStarOnly={showGachaSixStarOnly}
+              />
             </Tabs>
           </div>
       </div>
 
       {/* Floating Pagination Bar */}
-      {activeTab === "events" && newsTotalPages > 1 && (
+      {initialActiveTab === "events" && newsTotalPages > 1 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-2rem)] max-w-lg">
-          <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl border border-slate-200/60 p-3 sm:p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+          <div className="flex items-center justify-between bg-white border border-slate-200/60 p-3 sm:p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
             <Button
               variant="outline"
               onClick={() => setNewsPage((p) => Math.max(1, p - 1))}
