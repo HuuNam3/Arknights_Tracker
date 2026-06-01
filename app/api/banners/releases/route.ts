@@ -125,6 +125,16 @@ const normalizeBannerComparison = (value: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+const UPCOMING_BANNER_DATE_FALLBACKS: Record<string, string> = {
+  [normalizeBannerComparison("[Celebration] Sealed With Time")]: "2026-05-01",
+};
+
+const getKnownUpcomingCnDate = (bannerName: string, sourcePage: string) => {
+  if (sourcePage !== UPCOMING_PAGE) return null;
+
+  return UPCOMING_BANNER_DATE_FALLBACKS[normalizeBannerComparison(bannerName)] ?? null;
+};
+
 const isValidOperatorCandidate = (value: string, bannerName: string) => {
   if (!value) return false;
   if (
@@ -214,23 +224,28 @@ const extractBannerImageUrl = (cellHtml: string, bannerName: string) => {
   return toAbsoluteWikiUrl(fileMatch?.[1] ?? fileMatch?.[2] ?? null);
 };
 
-const parseBannerRows = (html: string, fallbackCategory: string) => {
+const parseBannerRows = (
+  html: string,
+  fallbackCategory: string,
+  sourcePage = "",
+) => {
   const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) ?? [];
   const banners: BannerRelease[] = [];
 
   for (const row of rows) {
-    const text = stripHtml(row);
-    const cnStartDate = extractLabeledDate(text, "CN");
-    const enStartDate =
-      extractLabeledDate(text, "Global") ?? extractLabeledDate(text, "Date");
-
-    if (!cnStartDate && !enStartDate) continue;
-
     const cells = extractRowCells(row);
     const bannerCell = cells[0] ?? row;
     const operatorCell = cells[1] ?? row;
     const name = extractBannerName(bannerCell);
     if (!name) continue;
+
+    const text = stripHtml(row);
+    const fallbackCnStartDate = getKnownUpcomingCnDate(name, sourcePage);
+    const cnStartDate = extractLabeledDate(text, "CN") ?? fallbackCnStartDate;
+    const enStartDate =
+      extractLabeledDate(text, "Global") ?? extractLabeledDate(text, "Date");
+
+    if (!cnStartDate && !enStartDate) continue;
 
     const releaseDate = cnStartDate ?? enStartDate;
     if (!releaseDate) continue;
@@ -312,7 +327,7 @@ const getYearPageCandidates = () => {
   for (let year = CURRENT_YEAR; year >= FIRST_BANNER_YEAR; year -= 1) {
     candidates.push(`Headhunting/Banners/${year}`);
 
-    if (year !== CURRENT_YEAR) {
+    if (year !== CURRENT_YEAR && year !== 2025) {
       candidates.push(`Headhunting/Banners/Former-${year}`);
     }
   }
@@ -378,12 +393,16 @@ export async function GET() {
       (entry): entry is { markup: string; page: string } => entry !== null,
     );
 
-    const currentBanners = parseBannerRows(mainMarkup, "Current");
+    const currentBanners = parseBannerRows(mainMarkup, "Current", MAIN_PAGE);
     const released = yearMarkupEntries.flatMap(({ markup, page }) =>
-      parseBannerRows(markup, page.includes("Former-") ? "Former" : "Banner"),
+      parseBannerRows(
+        markup,
+        page.includes("Former-") ? "Former" : "Banner",
+        page,
+      ),
     );
     const upcoming = upcomingMarkup
-      ? parseBannerRows(upcomingMarkup.markup, "Upcoming")
+      ? parseBannerRows(upcomingMarkup.markup, "Upcoming", upcomingMarkup.page)
       : [];
     const data = mergeBanners([...currentBanners, ...released], upcoming);
 

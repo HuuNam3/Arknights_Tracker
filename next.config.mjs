@@ -9,6 +9,14 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/operators/releases',
+        destination: '/api/operators',
+      },
+      {
+        source: '/api/banners/releases',
+        destination: '/api/banners',
+      },
+      {
         source: '/api/arknights/:path*',
         destination: 'https://arknights.global/api/:path*',
       },
