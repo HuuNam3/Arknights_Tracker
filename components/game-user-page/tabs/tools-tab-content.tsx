@@ -11,14 +11,12 @@ import {
 import { Tabs } from "@/components/ui/tabs";
 import { PullPlannerTabContent } from "@/components/game-user-page/tabs/tools/pull-planner-tab-content";
 import { RecruitmentTabContent } from "@/components/game-user-page/tabs/tools/recruitment-tab-content";
-import { SanityTabContent } from "@/components/game-user-page/tabs/tools/sanity-tab-content";
 
 type ToolsTabContentProps = {
   initialToolsTab: string;
   pullPlannerProps: any;
   recruitmentProps: any;
   renderStandaloneToolPage: boolean;
-  sanityProps: any;
 };
 
 export function ToolsTabContent({
@@ -26,7 +24,6 @@ export function ToolsTabContent({
   pullPlannerProps,
   recruitmentProps,
   renderStandaloneToolPage,
-  sanityProps,
 }: ToolsTabContentProps) {
   return (
     <>
@@ -58,7 +55,6 @@ export function ToolsTabContent({
             {initialToolsTab === "pull-planner" ? (
               <PullPlannerTabContent {...pullPlannerProps} />
             ) : null}
-            {initialToolsTab === "sanity" ? <SanityTabContent {...sanityProps} /> : null}
             {initialToolsTab === "recruitment" ? (
               <RecruitmentTabContent {...recruitmentProps} />
             ) : null}

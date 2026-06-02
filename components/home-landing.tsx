@@ -9,7 +9,6 @@ import {
   Shield,
   Trophy,
   Users,
-  Zap,
 } from "lucide-react";
 import { AccountLookupHero } from "@/components/account-lookup-hero";
 
@@ -52,13 +51,6 @@ const utilityCards = [
     tone: "border-emerald-200 bg-white text-emerald-900",
   },
   {
-    href: "/tools/sanity",
-    title: "Sanity",
-    description: "Tính hồi phục sanity và thời điểm full sanity cho tài khoản.",
-    icon: Zap,
-    tone: "border-violet-200 bg-white text-violet-900",
-  },
-  {
     href: "/tier-list",
     title: "Tier List",
     description: "Sắp xếp operator theo cách bạn đánh giá và lưu bộ xếp hạng.",
@@ -97,7 +89,7 @@ export function HomeLanding() {
               </div>
               <p className="mx-auto max-w-4xl text-lg font-medium text-slate-700 md:text-xl lg:mx-0">
                 Theo dõi Characters, Banners, Tier List, Pull Planner, Recruitment,
-                Sanity, Tin tức và lịch sử Gacha cho Arknights trong một nơi.
+                Tin tức và lịch sử Gacha cho Arknights trong một nơi.
               </p>
             </div>
           </div>

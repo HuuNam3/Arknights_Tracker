@@ -1,6 +1,6 @@
 # Arknights Tracker
 
-Arknights Tracker là một web app tổng hợp công cụ dành cho người chơi Arknights. Dự án gom những nhu cầu tra cứu phổ biến như banner, operator, pull planner, recruitment, sanity, news và gacha history vào cùng một nơi để dùng nhanh hơn.
+Arknights Tracker là một web app tổng hợp công cụ dành cho người chơi Arknights. Dự án gom những nhu cầu tra cứu phổ biến như banner, operator, pull planner, recruitment, news và gacha history vào cùng một nơi để dùng nhanh hơn.
 
 ## Overview
 
@@ -17,8 +17,6 @@ Website này được xây để phục vụ 2 mục tiêu chính:
   Tính số pull hiện có, tài nguyên tích lũy và khả năng chuẩn bị cho banner mục tiêu.
 - `Recruitment Calculator`
   Chọn tag để xem các tổ hợp hợp lệ và operator có thể xuất hiện.
-- `Sanity Tracker`
-  Theo dõi sanity hiện tại và thời điểm hồi đầy.
 - `Banner Tracker`
   Xem banner đã ra, banner hiện tại, banner sắp tới và trạng thái limited.
 - `Characters`
@@ -50,7 +48,7 @@ Nói ngắn gọn: đây là một lớp giao diện và xử lý dữ liệu đ
 - Trang chủ dẫn nhanh đến các công cụ chính.
 - Điều hướng bên trái giúp chuyển trang nhanh.
 - Một số dữ liệu người dùng được lưu trên trình duyệt để không phải nhập lại mỗi lần.
-- Các công cụ quan trọng như pull planner, sanity và tier list được tối ưu cho việc dùng lặp lại.
+- Các công cụ quan trọng như pull planner và tier list được tối ưu cho việc dùng lặp lại.
 
 ## What Is Stored Locally
 
@@ -61,7 +59,6 @@ Nói ngắn gọn: đây là một lớp giao diện và xử lý dữ liệu đ
 - token/cookie dùng cho gacha history
 - dữ liệu pull planner
 - tier list draft và các tier list đã lưu
-- trạng thái sanity theo từng UID
 
 ## Tech Stack
 
@@ -133,7 +130,7 @@ app/
 ├── gacha/                       # Trang gacha history
 ├── news/                        # Trang tin tức
 ├── tier-list/                   # Trang tier list
-├── tools/                       # Pull planner, recruitment, sanity
+├── tools/                       # Pull planner, recruitment
 ├── layout.tsx                   # Layout chính
 ├── page.tsx                     # Trang chủ
 ├── robots.ts                    # Robots metadata

@@ -12,7 +12,6 @@ import {
   ScrollText,
   Trophy,
   Users,
-  Zap,
 } from "lucide-react";
 import {
   HEADER_NAV_ITEMS,
@@ -32,7 +31,6 @@ const NAV_ICON_MAP: Record<HeaderNavIcon, LucideIcon> = {
   home: Home,
   diamond: Diamond,
   users: Users,
-  zap: Zap,
   gallery: GalleryHorizontal,
   trophy: Trophy,
   scroll: ScrollText,
@@ -65,12 +63,6 @@ const getNavToneStyles = (tone: HeaderNavTone, active: boolean) => {
       activeIcon: "bg-rose-200 text-rose-800",
       idleItem: "bg-white/50 text-slate-600 hover:border-rose-200 hover:bg-rose-50/70 hover:text-rose-900",
       idleIcon: "bg-rose-100 text-rose-600",
-    },
-    violet: {
-      activeItem: "border-violet-300 bg-violet-50 text-violet-800 shadow-sm",
-      activeIcon: "bg-violet-200 text-violet-800",
-      idleItem: "bg-white/50 text-slate-600 hover:border-violet-200 hover:bg-violet-50/70 hover:text-violet-900",
-      idleIcon: "bg-violet-100 text-violet-600",
     },
     sky: {
       activeItem: "border-sky-300 bg-sky-50 text-sky-800 shadow-sm",

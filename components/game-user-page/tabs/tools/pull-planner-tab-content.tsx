@@ -103,10 +103,7 @@ const ORUNDUM_FARMING_SUGGESTIONS = [
 
 type PullPlannerTabContentProps = {
   TOOL_ICON_URLS: Record<string, string>;
-  getPlannerResourceCardClassName: (resource: string) => string;
-  getPlannerSourceCardClassName: (label: string) => string;
   handlePullPlannerChange: (field: string, value: string | boolean) => void;
-  plannerAnnihilationUndoneMaps: number;
   plannerCurrentLeftoverOrundum: number;
   plannerCommendationShopBreakdown: Array<{
     month: number;
@@ -129,29 +126,16 @@ type PullPlannerTabContentProps = {
   plannerCurrentOrundum: number;
   plannerCurrentPulls: number;
   plannerDaysUntilBanner: number;
-  plannerMonthsUntilBanner: number;
   plannerOrundum: number;
   plannerPermits: number;
   plannerPrime: number;
   plannerProjectedBannerLeftoverOrundum: number;
   plannerProjectedBannerPulls: number;
-  plannerProjectedTransferableLeftoverOrundum: number;
-  plannerProjectedTransferablePulls: number;
   plannerReachableCommendationShopMonths: number;
   plannerReachableDistinctionShopMonths: number;
-  plannerReachableShopMonths: number;
   plannerShardOrundum: number;
   plannerShards: number;
-  plannerStableBreakdown: Array<{
-    detail: string;
-    freePulls: number;
-    label: string;
-    orundum: number;
-    permits: number;
-    scope: string;
-  }>;
   plannerTargetOnlyPulls: number;
-  plannerWeeksUntilBanner: number;
   pullPlanner: any;
   pullPlannerTargets: any[];
   selectedPullPlannerTarget: any | null;
@@ -159,10 +143,7 @@ type PullPlannerTabContentProps = {
 
 export function PullPlannerTabContent({
   TOOL_ICON_URLS,
-  getPlannerResourceCardClassName,
-  getPlannerSourceCardClassName,
   handlePullPlannerChange,
-  plannerAnnihilationUndoneMaps,
   plannerCurrentLeftoverOrundum,
   plannerCommendationShopBreakdown,
   plannerDistinctionShopBreakdown,
@@ -171,22 +152,16 @@ export function PullPlannerTabContent({
   plannerCurrentOrundum,
   plannerCurrentPulls,
   plannerDaysUntilBanner,
-  plannerMonthsUntilBanner,
   plannerOrundum,
   plannerPermits,
   plannerPrime,
   plannerProjectedBannerLeftoverOrundum,
   plannerProjectedBannerPulls,
-  plannerProjectedTransferableLeftoverOrundum,
-  plannerProjectedTransferablePulls,
   plannerReachableCommendationShopMonths,
   plannerReachableDistinctionShopMonths,
-  plannerReachableShopMonths,
   plannerShardOrundum,
   plannerShards,
-  plannerStableBreakdown,
   plannerTargetOnlyPulls,
-  plannerWeeksUntilBanner,
   pullPlanner,
   pullPlannerTargets,
   selectedPullPlannerTarget,
@@ -211,7 +186,6 @@ export function PullPlannerTabContent({
       field: "orundum",
       label: "Orundum",
       icon: TOOL_ICON_URLS.orundum,
-      note: "600 Orundum = 1 pull",
       cardClassName: "border-cyan-200 bg-cyan-50",
       inputClassName: "border-cyan-200 bg-white",
     },
@@ -219,7 +193,6 @@ export function PullPlannerTabContent({
       field: "originitePrime",
       label: "Originite Prime",
       icon: TOOL_ICON_URLS.originitePrime,
-      note: "1 OP = 180 Orundum",
       cardClassName: "border-amber-200 bg-amber-50",
       inputClassName: "border-amber-200 bg-white",
     },
@@ -227,7 +200,6 @@ export function PullPlannerTabContent({
       field: "permits",
       label: "Headhunting Permit",
       icon: TOOL_ICON_URLS.headhuntingPermit,
-      note: "1 permit = 1 pull",
       cardClassName: "border-emerald-200 bg-emerald-50",
       inputClassName: "border-emerald-200 bg-white",
     },
@@ -235,7 +207,6 @@ export function PullPlannerTabContent({
       field: "originiumShards",
       label: "Originium Shard",
       icon: TOOL_ICON_URLS.originiumShard,
-      note: "60 shard = 1 pull",
       cardClassName: "border-violet-200 bg-violet-50",
       inputClassName: "border-violet-200 bg-white",
     },
@@ -515,7 +486,7 @@ export function PullPlannerTabContent({
           </p>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
             {plannerResourceInputs.map(
-              ({ field, label, icon, note, cardClassName, inputClassName }) => (
+              ({ field, label, icon, cardClassName, inputClassName }) => (
               <div
                 key={field}
                 className={`space-y-2 rounded-2xl border p-3 shadow-sm ${cardClassName}`}

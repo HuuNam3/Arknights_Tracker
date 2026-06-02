@@ -948,58 +948,6 @@ const hydrateSavedTierList = (value: unknown): SavedTierList | null => {
   };
 };
 
-const MIN_DOCTOR_LEVEL = 1;
-const MAX_DOCTOR_LEVEL = 120;
-const GLOBAL_SANITY_BONUS = 45;
-
-const clampDoctorLevel = (level: number) =>
-  Math.min(MAX_DOCTOR_LEVEL, Math.max(MIN_DOCTOR_LEVEL, Math.floor(level)));
-
-const getBaseSanityCap = (level: number) => {
-  const doctorLevel = clampDoctorLevel(level);
-
-  if (doctorLevel === 1) return 82;
-  if (doctorLevel <= 5) return 82 + (doctorLevel - 1) * 2;
-  if (doctorLevel <= 35) return 90 + (doctorLevel - 5);
-  if (doctorLevel <= 85) return 120 + Math.floor((doctorLevel - 35) / 5);
-  if (doctorLevel <= 100) return 130;
-
-  return Math.min(135, 131 + Math.floor((doctorLevel - 101) / 4));
-};
-
-const getGlobalSanityCap = (level: number) =>
-  getBaseSanityCap(level) + GLOBAL_SANITY_BONUS;
-
-const formatRecoveryDuration = (minutes: number) => {
-  if (minutes <= 0) return "Đã đầy";
-
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  const mins = minutes % 60;
-  const parts = [];
-
-  if (days > 0) parts.push(`${days} ngày`);
-  if (hours > 0) parts.push(`${hours} giờ`);
-  if (mins > 0) parts.push(`${mins} phút`);
-
-  return parts.join(" ");
-};
-
-const formatRecoveryDateTime = (minutes: number) =>
-  new Intl.DateTimeFormat("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-  }).format(new Date(Date.now() + minutes * 60 * 1000));
-
-const SANITY_RECOVERY_MS = 6 * 60 * 1000;
-
-type SanitySnapshot = {
-  recordedAt: number;
-  value: number;
-};
-
 type OperatorRelease = {
   cnReleaseDate: string | null;
   enReleaseDate: string | null;
@@ -1113,15 +1061,6 @@ type DistinctionShopPurchases = {
   permits: number;
   remaining: number;
   spent: number;
-};
-
-type PlannerStableBreakdownEntry = {
-  detail: string;
-  freePulls: number;
-  label: string;
-  orundum: number;
-  permits: number;
-  scope: "target-only" | "transferable";
 };
 
 const DEFAULT_TIER_ORDER = ["S", "A", "B", "C", "D", "E"] as const;
@@ -1339,100 +1278,6 @@ const parseIsoDate = (value: string | null) => {
   const timestamp = Date.parse(`${value}T00:00:00Z`);
   return Number.isFinite(timestamp) ? timestamp : null;
 };
-
-const formatOrundumPullSummary = (orundum: number) => {
-  const pulls = Math.floor(orundum / 600);
-  const leftover = orundum % 600;
-
-  return leftover > 0
-    ? `${orundum} Orundum = ${pulls} pull + dư ${leftover} Orundum`
-    : `${orundum} Orundum = ${pulls} pull`;
-};
-
-const formatCombinedPullSummary = (
-  orundum: number,
-  permits: number,
-  freePulls = 0,
-) => {
-  const orundumPulls = Math.floor(orundum / 600);
-  const leftover = orundum % 600;
-  const totalPulls = orundumPulls + permits + freePulls;
-  const parts: string[] = [];
-
-  if (permits > 0) {
-    parts.push(`${permits} permit`);
-  }
-
-  if (freePulls > 0) {
-    parts.push(`${freePulls} free pull`);
-  }
-
-  if (orundum > 0) {
-    parts.push(`${orundum} Orundum`);
-  }
-
-  if (parts.length === 0) {
-    parts.push("0");
-  }
-
-  return `${parts.join(" + ")} = ${totalPulls} pull${
-    leftover > 0 ? ` + dư ${leftover} Orundum` : ""
-  }`;
-};
-
-const formatDistinctionMonthBreakdown = (
-  breakdown: DistinctionShopMonthBreakdown[],
-) =>
-  breakdown
-    .map((entry) => {
-      const batchSummary = entry.batches
-        .map((count, batchIndex) =>
-          count > 0
-            ? `${DISTINCTION_SHOP_BATCHES[batchIndex]?.permits}p x${count}`
-            : null,
-        )
-        .filter((value): value is string => value !== null)
-        .join(", ");
-
-      return `K${entry.month}: ${entry.permits} permit${
-        batchSummary ? ` (${batchSummary})` : ""
-      }, tốn ${entry.spent} cert`;
-    })
-    .join(" | ");
-
-const formatCommendationMonthBreakdown = (
-  breakdown: CommendationShopMonthBreakdown[],
-) =>
-  breakdown
-    .map((entry) => {
-      const parts: string[] = [];
-
-      if (entry.phase1Permits > 0 || entry.phase1OrundumBundles > 0) {
-        const phaseOneOrundum = entry.phase1OrundumBundles * COMMENDATION_ORUNDUM_BUNDLE_SIZE;
-        parts.push(
-          `P1 ${entry.phase1Permits} permit${
-            phaseOneOrundum > 0 ? ` + ${phaseOneOrundum} Orundum` : ""
-          }`,
-        );
-      }
-
-      if (entry.phase2Permits > 0) {
-        parts.push(`P2 ${entry.phase2Permits} permit`);
-      }
-
-      if (entry.phase3Bundles > 0) {
-        parts.push(
-          `P3 ${entry.phase3Bundles * COMMENDATION_PHASE_THREE_ORUNDUM_BUNDLE_SIZE} Orundum`,
-        );
-      }
-
-      if (parts.length === 0 && entry.permits > 0) {
-        parts.push(`${entry.permits} permit`);
-      }
-
-      return `K${entry.month}: ${parts.join(" + ") || "0"}, tốn ${entry.spent} cert`;
-    })
-    .join(" | ");
 
 const formatIsoDate = (timestamp: number) =>
   new Date(timestamp).toISOString().slice(0, 10);
@@ -1921,40 +1766,6 @@ const getEventShopPullsForBannerType = (bannerType: string | null) => {
   return 0;
 };
 
-const getPlannerResourceCardClassName = (resource: string) => {
-  if (resource === "Orundum") {
-    return "rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2";
-  }
-  if (resource === "Originite Prime") {
-    return "rounded-lg border border-amber-200 bg-amber-50 px-3 py-2";
-  }
-  if (resource === "Headhunting Permit") {
-    return "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2";
-  }
-  if (resource === "Intelligence Certificate") {
-    return "rounded-lg border border-rose-200 bg-rose-50 px-3 py-2";
-  }
-  if (resource === "Originium Shard") {
-    return "rounded-lg border border-violet-200 bg-violet-50 px-3 py-2";
-  }
-
-  return "rounded-lg border border-amber-200 bg-amber-50 px-3 py-2";
-};
-
-const getPlannerSourceCardClassName = (label: string) => {
-  if (/daily|weekly|annihilation/i.test(label)) {
-    return "flex items-start justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2";
-  }
-  if (/sign-in|thẻ tháng/i.test(label)) {
-    return "flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2";
-  }
-  if (/commendation|distinction/i.test(label)) {
-    return "flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2";
-  }
-
-  return "flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2";
-};
-
 const getMedianLagDays = <T,>(
   items: T[],
   getCnDate: (item: T) => string | null,
@@ -2170,41 +1981,6 @@ const TierAssignmentAvatar = ({
   );
 };
 
-const clampSanityValue = (value: number, cap: number) =>
-  Math.min(cap, Math.max(0, Math.floor(value)));
-
-const getSanityStorageKey = (uid: string) => `arknights_sanity:${uid}`;
-
-const getRecoveredSanityValue = (
-  snapshot: SanitySnapshot,
-  cap: number,
-  now: number,
-) => {
-  const elapsedSteps = Math.max(
-    0,
-    Math.floor((now - snapshot.recordedAt) / SANITY_RECOVERY_MS),
-  );
-
-  return Math.min(cap, snapshot.value + elapsedSteps);
-};
-
-const normalizeSanitySnapshot = (
-  snapshot: SanitySnapshot,
-  cap: number,
-  now: number,
-): SanitySnapshot => {
-  const recoveredValue = getRecoveredSanityValue(snapshot, cap, now);
-  if (recoveredValue >= cap) {
-    return { recordedAt: now, value: cap };
-  }
-
-  const remainder = Math.max(0, (now - snapshot.recordedAt) % SANITY_RECOVERY_MS);
-  return {
-    recordedAt: now - remainder,
-    value: recoveredValue,
-  };
-};
-
 const UI_TEXT = {
   appTagline:
     "Tra cứu tài khoản, theo dõi tin tức và kiểm tra lịch sử gacha Arknights.",
@@ -2217,19 +1993,6 @@ const UI_TEXT = {
   uidLabel: "UID",
   nicknameLabel: "Tên hiển thị",
   levelLabel: "Cấp Doctor",
-  sanityCapLabel: "Sanity tối đa",
-  sanityCapHint: "Tính theo mốc Global hiện tại",
-  sanityCalcTitle: "Máy tính sanity",
-  sanityCalcDescription:
-    "Nhập lượng sanity hiện tại để tính số còn thiếu và thời gian hồi đầy với tốc độ 1 sanity mỗi 6 phút.",
-  sanityInputPlaceholder: "Nhập sanity hiện tại",
-  sanityClampHint: "Nếu nhập vượt giới hạn, hệ thống sẽ tự giới hạn về",
-  currentSanityLabel: "Sanity hiện tại",
-  missingSanityLabel: "Còn thiếu",
-  fullRecoveryLabel: "Đầy sau",
-  fullNowLabel: "Đã đầy",
-  fullAtPrefix: "Đầy lúc",
-  inputToCalculate: "Nhập sanity để bắt đầu tính",
   eventsTab: "Tin tức",
   rewardsTab: "Đổi quà",
   gachaTab: "Gacha",
@@ -2342,21 +2105,6 @@ export function GameUserPage({
   const [bannerError, setBannerError] = useState("");
   const [bannerSearch, setBannerSearch] = useState("");
   const [bannerPage, setBannerPage] = useState(1);
-  const [currentSanityInput, setCurrentSanityInput] = useState("");
-  const [sanitySnapshot, setSanitySnapshot] = useState<SanitySnapshot | null>(
-    null,
-  );
-  const [nowTs, setNowTs] = useState(() => Date.now());
-
-  const sanityCap = userInfo ? getGlobalSanityCap(userInfo.level) : 0;
-  const currentSanity =
-    sanitySnapshot && userInfo
-      ? getRecoveredSanityValue(sanitySnapshot, sanityCap, nowTs)
-      : null;
-  const missingSanity =
-    currentSanity !== null ? Math.max(0, sanityCap - currentSanity) : null;
-  const recoveryMinutes =
-    missingSanity !== null ? missingSanity * 6 : null;
   const plannerOrundum = Math.max(0, parseNumberInput(pullPlanner.orundum));
   const plannerPrime = Math.max(0, parseNumberInput(pullPlanner.originitePrime));
   const plannerPermits = Math.max(0, parseNumberInput(pullPlanner.permits));
@@ -2803,7 +2551,6 @@ export function GameUserPage({
       )
     : 0;
   const plannerWeeksUntilBanner = Math.floor(plannerDaysUntilBanner / 7);
-  const plannerMonthsUntilBanner = plannerDaysUntilBanner / (MONTH_MS / DAY_MS);
   const plannerTargetTs =
     selectedPullPlannerTarget
       ? parseIsoDate(selectedPullPlannerTarget.date) ?? plannerTodayTs
@@ -2934,12 +2681,6 @@ export function GameUserPage({
     plannerCommendationShopPurchases.permits;
   const plannerFutureDistinctionShopPermits =
     plannerDistinctionShopPurchases.permits;
-  const plannerCommendationShopModeLabel =
-    plannerCommendationShopMode === "phase1"
-      ? "P1"
-      : plannerCommendationShopMode === "phase2"
-        ? "P2"
-        : "P3";
   const plannerFutureMonthlySignInPermits = pullPlanner.monthlySignInEnabled
     ? plannerReachableSignInPermits
     : 0;
@@ -2986,12 +2727,6 @@ export function GameUserPage({
     (sum, entry) => sum + entry.pulls,
     0,
   );
-  const plannerEventShopLimitedCount = plannerTimelineEventShopEntries.filter(
-    (entry) => entry.pulls === 5,
-  ).length;
-  const plannerEventShopStandardCount = plannerTimelineEventShopEntries.filter(
-    (entry) => entry.pulls === 3,
-  ).length;
   const plannerProjectedTransferableOrundum =
     plannerProjectedStartOrundum +
     plannerTransferableEventOrundum +
@@ -3009,152 +2744,8 @@ export function GameUserPage({
     plannerTargetOnlyEventPermits + plannerTargetOnlyEventFreePulls;
   const plannerProjectedBannerPulls =
     plannerProjectedTransferablePulls + plannerTargetOnlyPulls;
-  const plannerTransferableEventRewardSummary = formatCombinedPullSummary(
-    plannerTransferableEventOrundum,
-    plannerTransferableEventPermits,
-    0,
-  );
-  const plannerTargetOnlyRewardSummary = formatCombinedPullSummary(
-    0,
-    plannerTargetOnlyEventPermits,
-    plannerTargetOnlyEventFreePulls,
-  );
-  const plannerTargetOnlyRewardLabel = plannerTargetOnlyEventEntries
-    .map((entry) => entry.bonus.label)
-    .join(", ");
-  const plannerTargetOnlyRewardNote = plannerTargetOnlyEventEntries
-    .map((entry) => entry.bonus.note)
-    .join(" ");
   const plannerProjectedBannerLeftoverOrundum =
     plannerProjectedTransferableLeftoverOrundum;
-  const plannerEventShopSummary = formatCombinedPullSummary(
-    plannerEventShopOrundum,
-    plannerEventShopPermits,
-    0,
-  );
-  const plannerStableBreakdown = [
-    pullPlanner.dailyMissionEnabled
-      ? {
-          detail: `${plannerDaysUntilBanner} ngày x 100 = ${formatOrundumPullSummary(plannerFutureDailyOrundum)}`,
-          freePulls: 0,
-          label: "Daily mission",
-          orundum: plannerFutureDailyOrundum,
-          permits: 0,
-          scope: "transferable",
-        }
-      : null,
-    pullPlanner.weeklyMissionEnabled
-      ? {
-          detail: `${plannerWeeksUntilBanner} tuần x 500 = ${formatOrundumPullSummary(plannerFutureWeeklyMissionOrundum)}`,
-          freePulls: 0,
-          label: "Weekly mission",
-          orundum: plannerFutureWeeklyMissionOrundum,
-          permits: 0,
-          scope: "transferable",
-        }
-      : null,
-    {
-      detail: `${plannerWeeksUntilBanner} tuần x ${plannerWeeklyRegularOrundum} = ${formatOrundumPullSummary(plannerFutureRegularOrundum)}`,
-      freePulls: 0,
-      label: "Annihilation / weekly cap",
-      orundum: plannerFutureRegularOrundum,
-      permits: 0,
-      scope: "transferable",
-    },
-    plannerAnnihilationUndoneMaps > 0
-      ? {
-          detail: `${plannerAnnihilationUndoneMaps} map x ${ANNIHILATION_FIRST_CLEAR_ORUNDUM_PER_MAP} = ${formatOrundumPullSummary(plannerFutureAnnihilationFirstClearOrundum)}`,
-          freePulls: 0,
-          label: "Annihilation first-clear",
-          orundum: plannerFutureAnnihilationFirstClearOrundum,
-          permits: 0,
-          scope: "transferable",
-        }
-      : null,
-    pullPlanner.monthlyCardEnabled
-      ? {
-          detail: `${plannerDaysUntilBanner} ngày x 200 = ${formatOrundumPullSummary(plannerFutureMonthlyCardOrundum)}`,
-          freePulls: 0,
-          label: "Thẻ tháng",
-          orundum: plannerFutureMonthlyCardOrundum,
-          permits: 0,
-          scope: "transferable",
-        }
-      : null,
-    plannerCommendationShopPurchases.spent > 0
-      ? {
-          detail: `${plannerCommendationShopPurchases.spent}/${plannerCommendations} cert (${plannerCommendationShopModeLabel}, ${plannerReachableCommendationShopMonths} kỳ) = ${formatCombinedPullSummary(
-            plannerFutureCommendationShopOrundum,
-            plannerFutureCommendationShopPermits,
-          )}, dư ${plannerCommendationShopPurchases.remaining} cert. ${formatCommendationMonthBreakdown(
-            plannerCommendationShopPurchases.breakdown,
-          )}`,
-          freePulls: 0,
-          label: "Commendation shop",
-          orundum: plannerFutureCommendationShopOrundum,
-          permits: plannerFutureCommendationShopPermits,
-          scope: "transferable",
-        }
-      : null,
-    plannerDistinctionShopPurchases.spent > 0
-      ? {
-          detail: `${plannerDistinctionShopPurchases.spent}/${plannerDistinctions} cert (${plannerDistinctionShopPurchases.monthsUsed}/${plannerReachableDistinctionShopMonths} kỳ) = ${formatCombinedPullSummary(
-            0,
-            plannerFutureDistinctionShopPermits,
-          )}, dư ${plannerDistinctionShopPurchases.remaining} cert. ${formatDistinctionMonthBreakdown(
-            plannerDistinctionShopPurchases.breakdown,
-          )}`,
-          freePulls: 0,
-          label: "Distinction shop",
-          orundum: 0,
-          permits: plannerFutureDistinctionShopPermits,
-          scope: "transferable",
-        }
-      : null,
-    pullPlanner.eventRewardsEnabled &&
-    (plannerTransferableEventOrundum > 0 || plannerTransferableEventPermits > 0)
-      ? {
-          detail: `${plannerTimelineEventBonuses.length} banner/event trước hoặc tại target = ${plannerTransferableEventRewardSummary}`,
-          freePulls: 0,
-          label: "Quà sự kiện tích trữ",
-          orundum: plannerTransferableEventOrundum,
-          permits: plannerTransferableEventPermits,
-          scope: "transferable",
-        }
-      : null,
-    pullPlanner.eventRewardsEnabled && plannerTargetOnlyPulls > 0
-      ? {
-          detail: `${selectedPullPlannerTarget?.name ?? "Banner target"} = ${plannerTargetOnlyRewardSummary}${
-            plannerTargetOnlyRewardLabel ? ` (${plannerTargetOnlyRewardLabel})` : ""
-          }. ${plannerTargetOnlyRewardNote}`.trim(),
-          freePulls: plannerTargetOnlyEventFreePulls,
-          label: "Free pull riêng banner target",
-          orundum: 0,
-          permits: plannerTargetOnlyEventPermits,
-          scope: "target-only",
-        }
-      : null,
-    pullPlanner.eventShopEnabled && plannerEventShopPermits > 0
-      ? {
-          detail: `${plannerEventShopStandardCount} event thường x 3 + ${plannerEventShopLimitedCount} event limit/collab x 5 = ${plannerEventShopSummary}`,
-          freePulls: 0,
-          label: "Đổi shop sự kiện",
-          orundum: plannerEventShopOrundum,
-          permits: plannerEventShopPermits,
-          scope: "transferable",
-        }
-      : null,
-    pullPlanner.monthlySignInEnabled
-      ? {
-          detail: `${plannerReachableSignInPermits} mốc ngày ${DAILY_SIGNIN_PERMIT_DAY} = ${plannerFutureMonthlySignInPermits} permit = ${plannerFutureMonthlySignInPermits} pull`,
-          freePulls: 0,
-          label: "Daily sign-in",
-          orundum: 0,
-          permits: plannerFutureMonthlySignInPermits,
-          scope: "transferable",
-        }
-      : null,
-  ].filter((entry): entry is PlannerStableBreakdownEntry => entry !== null);
   const filteredBanners = [...bannerData]
     .sort((a, b) => {
       const aIsReleased = Boolean(a.enStartDate);
@@ -3316,115 +2907,6 @@ export function GameUserPage({
     (bannerPage - 1) * BANNERS_PER_PAGE,
     bannerPage * BANNERS_PER_PAGE,
   );
-
-  const restoreSanitySnapshot = (
-    targetUid: string,
-    cap: number,
-    fallbackValue?: number,
-  ) => {
-    const now = Date.now();
-    try {
-      const raw = localStorage.getItem(getSanityStorageKey(targetUid));
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<SanitySnapshot>;
-        if (
-          typeof parsed?.value === "number" &&
-          Number.isFinite(parsed.value) &&
-          typeof parsed?.recordedAt === "number" &&
-          Number.isFinite(parsed.recordedAt)
-        ) {
-          const normalized = normalizeSanitySnapshot(
-            {
-              recordedAt: parsed.recordedAt,
-              value: clampSanityValue(parsed.value, cap),
-            },
-            cap,
-            now,
-          );
-          setSanitySnapshot(normalized);
-          setCurrentSanityInput(String(normalized.value));
-          return;
-        }
-      }
-    } catch (error) {
-      console.error("Failed to restore sanity snapshot", error);
-    }
-
-    if (typeof fallbackValue === "number") {
-      const initialSnapshot = {
-        recordedAt: now,
-        value: clampSanityValue(fallbackValue, cap),
-      };
-      setSanitySnapshot(initialSnapshot);
-      setCurrentSanityInput(String(initialSnapshot.value));
-    } else {
-      setSanitySnapshot(null);
-      setCurrentSanityInput("");
-    }
-  };
-
-  const hydrateSanityFromInput = (nextValue: string) => {
-    setCurrentSanityInput(nextValue);
-
-    if (!userInfo || !nextValue.trim()) {
-      setSanitySnapshot(null);
-      return;
-    }
-
-    const parsedValue = Number(nextValue);
-    if (!Number.isFinite(parsedValue)) {
-      setSanitySnapshot(null);
-      return;
-    }
-
-    setNowTs(Date.now());
-    setSanitySnapshot({
-      recordedAt: Date.now(),
-      value: clampSanityValue(parsedValue, sanityCap),
-    });
-  };
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setNowTs(Date.now());
-    }, 60 * 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
-    if (!userInfo) {
-      setSanitySnapshot(null);
-      setCurrentSanityInput("");
-      return;
-    }
-
-    restoreSanitySnapshot(userInfo.uid, sanityCap, sanityCap);
-  }, [userInfo]);
-
-  useEffect(() => {
-    if (!userInfo || !sanitySnapshot) return;
-
-    const displayValue = String(currentSanity ?? sanitySnapshot.value);
-    if (currentSanityInput !== displayValue) {
-      setCurrentSanityInput(displayValue);
-    }
-  }, [currentSanity, currentSanityInput, sanitySnapshot, userInfo]);
-
-  useEffect(() => {
-    if (!userInfo) return;
-
-    if (!sanitySnapshot) {
-      localStorage.removeItem(getSanityStorageKey(userInfo.uid));
-      return;
-    }
-
-    const normalized = normalizeSanitySnapshot(sanitySnapshot, sanityCap, nowTs);
-    localStorage.setItem(
-      getSanityStorageKey(userInfo.uid),
-      JSON.stringify(normalized),
-    );
-  }, [nowTs, sanityCap, sanitySnapshot, userInfo]);
 
   const readJsonResponse = async (res: Response) => {
     const raw = await res.text();
@@ -4107,8 +3589,6 @@ export function GameUserPage({
                   renderStandaloneToolPage={renderStandaloneToolPage}
                   pullPlannerProps={{
                     TOOL_ICON_URLS,
-                    getPlannerResourceCardClassName,
-                    getPlannerSourceCardClassName,
                     handlePullPlannerChange,
                     plannerCommendationShopBreakdown:
                       plannerCommendationShopPurchases.breakdown,
@@ -4120,37 +3600,19 @@ export function GameUserPage({
                     plannerCurrentOrundum,
                     plannerCurrentPulls,
                     plannerDaysUntilBanner,
-                    plannerMonthsUntilBanner,
                     plannerOrundum,
                     plannerPermits,
                     plannerPrime,
                     plannerProjectedBannerLeftoverOrundum,
                     plannerProjectedBannerPulls,
-                    plannerProjectedTransferableLeftoverOrundum,
-                    plannerProjectedTransferablePulls,
                     plannerReachableCommendationShopMonths,
                     plannerReachableDistinctionShopMonths,
-                    plannerReachableShopMonths,
                     plannerShardOrundum,
                     plannerShards,
-                    plannerStableBreakdown,
-                    plannerAnnihilationUndoneMaps,
                     plannerTargetOnlyPulls,
-                    plannerWeeksUntilBanner,
                     pullPlanner,
                     pullPlannerTargets,
                     selectedPullPlannerTarget,
-                  }}
-                  sanityProps={{
-                    currentSanity,
-                    currentSanityInput,
-                    formatRecoveryDateTime,
-                    formatRecoveryDuration,
-                    hydrateSanityFromInput,
-                    missingSanity,
-                    recoveryMinutes,
-                    sanityCap,
-                    userInfo,
                   }}
                   recruitmentProps={{
                     RECRUITMENT_SPECIAL_TAGS,
