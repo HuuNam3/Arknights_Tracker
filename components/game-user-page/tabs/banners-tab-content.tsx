@@ -109,7 +109,9 @@ export function BannersTabContent({
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {paginatedBanners.map((banner) => {
                   const isReleased = Boolean(banner.enStartDate);
+                  const isCurrentBanner = Boolean(banner.current);
                   const bannerIsLimited = isBannerLimited(banner);
+                  const bannerCategoryLabel = banner.category ?? "Standard Pool";
                   const visibleBannerOperators = getNormalizedBannerOperatorNames(banner);
                   const predictionDetails =
                     bannerPredictionDetailsByKey.get(getBannerKey(banner)) ?? null;
@@ -140,7 +142,7 @@ export function BannersTabContent({
                                 : "border-slate-200 bg-slate-50 text-slate-500"
                             }
                           >
-                            {bannerIsLimited ? "Limited" : banner.category}
+                            {bannerIsLimited ? "Limited" : bannerCategoryLabel}
                           </Badge>
                         </div>
 
@@ -193,12 +195,15 @@ export function BannersTabContent({
                           {visibleBannerOperators.length > 0 ? (
                             <div className="mt-3 grid w-full grid-cols-2 gap-2">
                               {visibleBannerOperators.map((operatorName) => {
-                                const isNewOperator = banner.enStartDate
-                                  ? earliestReleasedBannerDateByOperator.get(operatorName) ===
-                                    banner.enStartDate
-                                  : upcomingNewOperatorsByBanner
-                                      .get(getBannerKey(banner))
-                                      ?.has(operatorName) ?? false;
+                                const isNewOperator =
+                                  isCurrentBanner && banner.enStartDate
+                                    ? earliestReleasedBannerDateByOperator.get(operatorName) ===
+                                      banner.enStartDate
+                                    : !isReleased &&
+                                      (upcomingNewOperatorsByBanner
+                                        .get(getBannerKey(banner))
+                                        ?.has(operatorName) ??
+                                        false);
 
                                 return (
                                   <div

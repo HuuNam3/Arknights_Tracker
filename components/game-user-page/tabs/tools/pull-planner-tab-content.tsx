@@ -186,29 +186,29 @@ export function PullPlannerTabContent({
       field: "orundum",
       label: "Orundum",
       icon: TOOL_ICON_URLS.orundum,
-      cardClassName: "border-cyan-200 bg-cyan-50",
-      inputClassName: "border-cyan-200 bg-white",
+      cardClassName: "border-rose-200 bg-rose-50",
+      inputClassName: "border-rose-200 bg-white focus-visible:ring-rose-200",
     },
     {
       field: "originitePrime",
       label: "Originite Prime",
       icon: TOOL_ICON_URLS.originitePrime,
       cardClassName: "border-amber-200 bg-amber-50",
-      inputClassName: "border-amber-200 bg-white",
+      inputClassName: "border-amber-200 bg-white focus-visible:ring-amber-200",
     },
     {
       field: "permits",
       label: "Headhunting Permit",
       icon: TOOL_ICON_URLS.headhuntingPermit,
       cardClassName: "border-emerald-200 bg-emerald-50",
-      inputClassName: "border-emerald-200 bg-white",
+      inputClassName: "border-emerald-200 bg-white focus-visible:ring-emerald-200",
     },
     {
       field: "originiumShards",
       label: "Originium Shard",
       icon: TOOL_ICON_URLS.originiumShard,
       cardClassName: "border-violet-200 bg-violet-50",
-      inputClassName: "border-violet-200 bg-white",
+      inputClassName: "border-violet-200 bg-white focus-visible:ring-violet-200",
     },
   ] as const;
 
@@ -442,8 +442,8 @@ export function PullPlannerTabContent({
       <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="rounded-xl border border-amber-200 bg-amber-100 p-2.5">
-              <Diamond className="h-5 w-5 text-amber-700" />
+            <div className="rounded-xl border border-cyan-200 bg-cyan-100 p-2.5">
+              <Diamond className="h-5 w-5 text-cyan-700" />
             </div>
             <div>
               <p className="text-lg font-bold text-slate-800">Pull Planner</p>
@@ -484,7 +484,7 @@ export function PullPlannerTabContent({
             Nhập tài nguyên hiện có của bạn, gồm cả cert, để quy đổi pull hiện tại và
             tính phần shop trước banner.
           </p>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             {plannerResourceInputs.map(
               ({ field, label, icon, cardClassName, inputClassName }) => (
               <div
@@ -532,7 +532,7 @@ export function PullPlannerTabContent({
                 value={pullPlanner.commendations}
                 onChange={(e) => handlePullPlannerChange("commendations", e.target.value)}
                 placeholder="Commendations"
-                className="rounded-xl border-lime-200 bg-white"
+                className="rounded-xl border-lime-200 bg-white focus-visible:ring-lime-200"
               />
               <div className="grid grid-cols-3 gap-1">
                 {([
@@ -581,11 +581,11 @@ export function PullPlannerTabContent({
                 value={pullPlanner.distinctions}
                 onChange={(e) => handlePullPlannerChange("distinctions", e.target.value)}
                 placeholder="Distinctions"
-                className="rounded-xl border-yellow-200 bg-white"
+                className="rounded-xl border-yellow-200 bg-white focus-visible:ring-yellow-200"
               />
             </div>
 
-            <div className="space-y-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 shadow-sm">
+            <div className="space-y-2 rounded-2xl border border-pink-200 bg-pink-50 p-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <img
                   src={TOOL_ICON_URLS.intelligenceCertificate}
@@ -605,13 +605,23 @@ export function PullPlannerTabContent({
                   handlePullPlannerChange("intelligenceCertificates", e.target.value)
                 }
                 placeholder="Intelligence Certificate"
-                className="rounded-xl border-rose-200 bg-white"
+                className="rounded-xl border-pink-200 bg-white focus-visible:ring-pink-200"
               />
             </div>
 
             <div className="space-y-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-800">Annihilation mỗi tuần</p>
+                <div className="flex items-center gap-2">
+                  <img
+                    src={TOOL_ICON_URLS.annihilationOperation}
+                    alt="Annihilation Operation"
+                    className="size-5 object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                  <p className="text-sm font-semibold text-slate-800">Annihilation mỗi tuần</p>
+                </div>
                 <Badge variant="outline" className="border-sky-200 bg-white text-sky-700">
                   {normalizedWeeklyRegularOrundum}
                 </Badge>
@@ -669,13 +679,17 @@ export function PullPlannerTabContent({
           ].map(([field, title, subtitle, detail]) => (
             <label
               key={field}
-              className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4"
+              className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
+                pullPlanner[field]
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-slate-100 bg-white"
+              }`}
             >
               <input
                 type="checkbox"
                 checked={pullPlanner[field]}
                 onChange={(e) => handlePullPlannerChange(field, e.target.checked)}
-                className="size-4 accent-amber-600"
+                className="size-4 accent-emerald-600"
               />
               <div>
                 <p className="font-semibold text-slate-800">{title}</p>
@@ -685,7 +699,13 @@ export function PullPlannerTabContent({
             </label>
           ))}
 
-          <label className="flex items-center gap-3 rounded-xl border border-lime-100 bg-white p-4">
+          <label
+            className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
+              pullPlanner.commendationShopCurrentMonthClaimed
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-slate-100 bg-white"
+            }`}
+          >
             <input
               type="checkbox"
               checked={pullPlanner.commendationShopCurrentMonthClaimed}
@@ -695,7 +715,7 @@ export function PullPlannerTabContent({
                   e.target.checked,
                 )
               }
-              className="size-4 accent-lime-600"
+              className="size-4 accent-emerald-600"
             />
             <div>
               <p className="font-semibold text-slate-800">Đã đổi Commendation tháng này</p>
@@ -708,7 +728,13 @@ export function PullPlannerTabContent({
             </div>
           </label>
 
-          <label className="flex items-center gap-3 rounded-xl border border-yellow-100 bg-white p-4">
+          <label
+            className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
+              pullPlanner.distinctionShopCurrentMonthClaimed
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-slate-100 bg-white"
+            }`}
+          >
             <input
               type="checkbox"
               checked={pullPlanner.distinctionShopCurrentMonthClaimed}
@@ -718,7 +744,7 @@ export function PullPlannerTabContent({
                   e.target.checked,
                 )
               }
-              className="size-4 accent-yellow-600"
+              className="size-4 accent-emerald-600"
             />
             <div>
               <p className="font-semibold text-slate-800">Đã đổi Distinction tháng này</p>
@@ -731,13 +757,19 @@ export function PullPlannerTabContent({
             </div>
           </label>
 
-          <label className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4">
+          <label
+            className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
+              pullPlanner.eventShopEnabled
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-slate-100 bg-white"
+            } ${!pullPlanner.eventRewardsEnabled ? "opacity-70" : ""}`}
+          >
             <input
               type="checkbox"
               checked={pullPlanner.eventShopEnabled}
               disabled={!pullPlanner.eventRewardsEnabled}
               onChange={(e) => handlePullPlannerChange("eventShopEnabled", e.target.checked)}
-              className="size-4 accent-amber-600 disabled:opacity-50"
+              className="size-4 accent-emerald-600 disabled:opacity-50"
             />
             <div>
               <p className="font-semibold text-slate-800">Đổi shop sự kiện</p>
@@ -753,7 +785,7 @@ export function PullPlannerTabContent({
           <div className="flex items-center justify-between gap-3">
             <p className="font-semibold text-slate-800">Chi tiết tích pull đến banner bạn muốn</p>
           </div>
-          <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 p-4">
+          <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-semibold text-slate-800">Các tuần tích pull đều đặn</p>
@@ -808,7 +840,7 @@ export function PullPlannerTabContent({
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase text-slate-500">Pull hiện có</p>
             <p className="mt-1 text-2xl font-black text-slate-800">{plannerCurrentPulls}</p>
             <div className="mt-2 space-y-1 text-xs text-slate-500">
@@ -826,11 +858,11 @@ export function PullPlannerTabContent({
               </p>
             </div>
           </div>
-          <div className="rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-cyan-50 p-4">
+          <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase text-slate-500">
               Pull tích được trong {weeklypullTimeline.length} tuần
             </p>
-            <p className="mt-1 text-2xl font-black text-sky-700">{weeklypullTimelineTotalPulls}</p>
+            <p className="mt-1 text-2xl font-black text-cyan-800">{weeklypullTimelineTotalPulls}</p>
             <div className="mt-2 space-y-1 text-xs text-slate-500">
               <p>
                 Lấy tổng từ các dòng <span className="font-semibold">Tổng tuần</span> trong bảng chi tiết phía trên.
@@ -848,9 +880,9 @@ export function PullPlannerTabContent({
               <p>Không cộng tài nguyên đang có sẵn trong kho của bạn.</p>
             </div>
           </div>
-          <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase text-slate-500">Pull dự kiến khi đến banner</p>
-            <p className="mt-1 text-2xl font-black text-amber-600">{plannerProjectedBannerPulls}</p>
+            <p className="mt-1 text-2xl font-black text-emerald-800">{plannerProjectedBannerPulls}</p>
             <div className="mt-2 space-y-1 text-xs text-slate-500">
               <p>Đây là số pull dự kiến dùng được khi banner bắt đầu.</p>
               <p>

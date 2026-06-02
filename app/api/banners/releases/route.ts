@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
-const FIRST_BANNER_YEAR = 2020;
-const MAIN_PAGE = "Headhunting/Banners";
+const VISIBLE_BANNER_YEARS = new Set([CURRENT_YEAR, CURRENT_YEAR - 1]);
 const UPCOMING_PAGE = "Headhunting/Banners/Upcoming";
+const BANNER_YEAR_PAGES = ["Headhunting/Banners/2026", "Headhunting/Banners/2025"];
+const BANNER_CATEGORY_SECTIONS = [
+  ["Limited", "Limited"],
+  ["Special", "Special"],
+  ["Standard_Pool", "Standard Pool"],
+  ["Kernel", "Kernel"],
+] as const;
 const WIKI_PARSE_API = (page: string) =>
   `https://arknights.wiki.gg/api.php?action=parse&page=${encodeURIComponent(
     page,
@@ -12,7 +18,10 @@ const WIKI_PARSE_API = (page: string) =>
 type BannerRelease = {
   bannerImageUrl: string | null;
   category: string;
+  cnEndDate: string | null;
   cnStartDate: string | null;
+  current: boolean;
+  enEndDate: string | null;
   enStartDate: string | null;
   globalReleased: boolean;
   limited: boolean;
@@ -26,6 +35,28 @@ type BannerRelease = {
 type BannerOperatorEntry = {
   name: string;
   rarity?: string;
+};
+
+const normalizeBannerCategory = (
+  rawCategory: string | null | undefined,
+  bannerName: string,
+  rowText = "",
+) => {
+  const text = `${rawCategory ?? ""} ${bannerName} ${rowText}`.toLowerCase();
+
+  if (/kernel/.test(text)) {
+    return "Kernel";
+  }
+
+  if (/limited|festival|carnival|celebration|vision/.test(text)) {
+    return "Limited";
+  }
+
+  if (/special|joint operation|collab|crossover|collaboration/.test(text)) {
+    return "Special";
+  }
+
+  return "Special";
 };
 
 const toAbsoluteWikiUrl = (value: string | null) => {
@@ -68,11 +99,26 @@ const extractRowCells = (row: string) => {
   return [match[1] ?? "", match[2] ?? ""];
 };
 
-const extractLabeledDate = (value: string, label: "CN" | "Global" | "Date") => {
-  const match = value.match(
-    new RegExp(`${label} date:\\s*(\\d{4}[/-]\\d{2}[/-]\\d{2})`, "i"),
+const extractLabeledDateRange = (value: string, label: "CN" | "Global" | "Date") => {
+  const labelText = label === "Date" ? "Date" : `${label} date`;
+  const searchableValue =
+    label === "Date"
+      ? value.replace(
+          /\b(?:CN|Global) date:\s*\d{4}[/-]\d{2}[/-]\d{2}(?:\s*[\u2013\-]\s*\d{4}[/-]\d{2}[/-]\d{2})?/gi,
+          "",
+        )
+      : value;
+  const match = searchableValue.match(
+    new RegExp(
+      `${labelText}:\\s*(\\d{4}[/-]\\d{2}[/-]\\d{2})(?:\\s*[\\u2013\\-]\\s*(\\d{4}[/-]\\d{2}[/-]\\d{2}))?`,
+      "i",
+    ),
   );
-  return normalizeDate(match?.[1] ?? null);
+
+  return {
+    endDate: normalizeDate(match?.[2] ?? null),
+    startDate: normalizeDate(match?.[1] ?? null),
+  };
 };
 
 const extractBannerName = (cellHtml: string) => {
@@ -133,6 +179,43 @@ const getKnownUpcomingCnDate = (bannerName: string, sourcePage: string) => {
   if (sourcePage !== UPCOMING_PAGE) return null;
 
   return UPCOMING_BANNER_DATE_FALLBACKS[normalizeBannerComparison(bannerName)] ?? null;
+};
+
+const getSectionMarkup = (html: string, sectionId: string) => {
+  const headingPattern = new RegExp(
+    `<h2[^>]*>[\\s\\S]*?<span[^>]*id="${sectionId}"[^>]*>[\\s\\S]*?<\\/h2>`,
+    "i",
+  );
+  const headingMatch = headingPattern.exec(html);
+  if (!headingMatch) return "";
+
+  const startIndex = headingMatch.index + headingMatch[0].length;
+  const nextHeadingMatch = /<h2[^>]*>[\s\S]*?<\/h2>/i.exec(html.slice(startIndex));
+  const endIndex = nextHeadingMatch
+    ? startIndex + nextHeadingMatch.index
+    : html.length;
+
+  return html.slice(startIndex, endIndex);
+};
+
+const parseYearPageBannerRows = (html: string, sourcePage: string) =>
+  BANNER_CATEGORY_SECTIONS.flatMap(([sectionId, category]) =>
+    parseBannerRows(getSectionMarkup(html, sectionId), category, sourcePage),
+  );
+
+const isBannerCurrentOnGlobal = (enStartDate: string | null, enEndDate: string | null) => {
+  if (!enStartDate) return false;
+
+  const today = new Date();
+  const todayUtc = Date.UTC(
+    today.getUTCFullYear(),
+    today.getUTCMonth(),
+    today.getUTCDate(),
+  );
+  const startTs = Date.parse(`${enStartDate}T00:00:00Z`);
+  const endTs = Date.parse(`${enEndDate ?? enStartDate}T23:59:59Z`);
+
+  return Number.isFinite(startTs) && Number.isFinite(endTs) && todayUtc >= startTs && todayUtc <= endTs;
 };
 
 const isValidOperatorCandidate = (value: string, bannerName: string) => {
@@ -241,36 +324,44 @@ const parseBannerRows = (
 
     const text = stripHtml(row);
     const fallbackCnStartDate = getKnownUpcomingCnDate(name, sourcePage);
-    const cnStartDate = extractLabeledDate(text, "CN") ?? fallbackCnStartDate;
-    const enStartDate =
-      extractLabeledDate(text, "Global") ?? extractLabeledDate(text, "Date");
+    const cnDateRange = extractLabeledDateRange(text, "CN");
+    const globalDateRange = extractLabeledDateRange(text, "Global");
+    const dateRange = extractLabeledDateRange(text, "Date");
+    const cnStartDate = cnDateRange.startDate ?? fallbackCnStartDate;
+    const cnEndDate = cnDateRange.endDate;
+    const enStartDate = globalDateRange.startDate ?? dateRange.startDate;
+    const enEndDate = globalDateRange.endDate ?? dateRange.endDate;
 
     if (!cnStartDate && !enStartDate) continue;
 
-    const releaseDate = cnStartDate ?? enStartDate;
+    const releaseDate = enStartDate ?? cnStartDate;
     if (!releaseDate) continue;
 
     const releaseTs = Date.parse(`${releaseDate}T00:00:00Z`);
     if (!Number.isFinite(releaseTs)) continue;
 
-    const categoryMatch =
-      name.match(/\[(Limited|Festival|Carnival|Celebration|Vision)\]/i) ??
-      text.match(
-        /\b(Limited|Special|Standard|Kernel|Joint Operation|Celebration|Vision|Festival|Carnival)\b/i,
-      );
-    const category = categoryMatch?.[1] ?? fallbackCategory;
+    const category =
+      /\bkernel\b/i.test(name)
+        ? "Kernel"
+        : /\bstandard pool\b/i.test(name)
+          ? "Standard Pool"
+          : fallbackCategory === "Standard Pool"
+            ? "Special"
+            : BANNER_CATEGORY_SECTIONS.some(([, sectionCategory]) => sectionCategory === fallbackCategory)
+              ? fallbackCategory
+              : normalizeBannerCategory(fallbackCategory, name, text);
     const operatorEntries = extractOperatorNames(operatorCell, name);
 
     banners.push({
       bannerImageUrl: extractBannerImageUrl(bannerCell, name),
       category,
+      cnEndDate,
       cnStartDate,
+      current: isBannerCurrentOnGlobal(enStartDate, enEndDate),
+      enEndDate,
       enStartDate,
       globalReleased: Boolean(enStartDate),
-      limited:
-        /\[(Festival|Carnival|Celebration|Vision|Limited)\]/i.test(name) ||
-        /limited/i.test(text) ||
-        /celebration|festival|carnival|vision/i.test(category.toLowerCase()),
+      limited: category === "Limited",
       name,
       operators: operatorEntries.map((entry) => entry.name),
       operatorRarities: Object.fromEntries(
@@ -321,18 +412,17 @@ const fetchParsedMarkupSafe = async (page: string) => {
   }
 };
 
-const getYearPageCandidates = () => {
-  const candidates: string[] = [];
+const getBannerVisibleYear = (banner: BannerRelease) => {
+  const displayDate = banner.enStartDate ?? banner.cnStartDate ?? banner.releaseDate;
+  const year = Number.parseInt(displayDate.slice(0, 4), 10);
 
-  for (let year = CURRENT_YEAR; year >= FIRST_BANNER_YEAR; year -= 1) {
-    candidates.push(`Headhunting/Banners/${year}`);
+  return Number.isFinite(year) ? year : null;
+};
 
-    if (year !== CURRENT_YEAR && year !== 2025) {
-      candidates.push(`Headhunting/Banners/Former-${year}`);
-    }
-  }
+const isBannerInVisibleYearRange = (banner: BannerRelease) => {
+  const year = getBannerVisibleYear(banner);
 
-  return [...new Set(candidates)];
+  return year !== null && VISIBLE_BANNER_YEARS.has(year);
 };
 
 const getBannerKey = (banner: BannerRelease) =>
@@ -354,18 +444,27 @@ const mergeBanners = (released: BannerRelease[], upcoming: BannerRelease[]) => {
     }
 
     const cnStartDate = existing.cnStartDate ?? banner.cnStartDate;
+    const cnEndDate = existing.cnEndDate ?? banner.cnEndDate;
     const enStartDate = existing.enStartDate ?? banner.enStartDate;
-    const releaseDate = cnStartDate ?? enStartDate ?? existing.releaseDate;
+    const enEndDate = existing.enEndDate ?? banner.enEndDate;
+    const releaseDate = enStartDate ?? cnStartDate ?? existing.releaseDate;
     const releaseTs = Date.parse(`${releaseDate}T00:00:00Z`);
+    const category = existing.category || banner.category;
 
     merged.set(bannerKey, {
       ...existing,
       bannerImageUrl: existing.bannerImageUrl ?? banner.bannerImageUrl,
-      category: existing.category || banner.category,
+      category,
+      cnEndDate,
       cnStartDate,
+      current:
+        existing.current ||
+        banner.current ||
+        isBannerCurrentOnGlobal(enStartDate, enEndDate),
+      enEndDate,
       enStartDate,
       globalReleased: Boolean(enStartDate),
-      limited: existing.limited || banner.limited,
+      limited: category === "Limited" || existing.limited || banner.limited,
       operators:
         existing.operators.length >= banner.operators.length
           ? existing.operators
@@ -384,33 +483,28 @@ const mergeBanners = (released: BannerRelease[], upcoming: BannerRelease[]) => {
 
 export async function GET() {
   try {
-    const [mainMarkup, upcomingMarkup, ...yearMarkupResults] = await Promise.all([
-      fetchParsedMarkup(MAIN_PAGE),
+    const [upcomingMarkup, ...yearMarkupResults] = await Promise.all([
       fetchParsedMarkupSafe(UPCOMING_PAGE),
-      ...getYearPageCandidates().map((page) => fetchParsedMarkupSafe(page)),
+      ...BANNER_YEAR_PAGES.map((page) => fetchParsedMarkupSafe(page)),
     ]);
     const yearMarkupEntries = yearMarkupResults.filter(
       (entry): entry is { markup: string; page: string } => entry !== null,
     );
 
-    const currentBanners = parseBannerRows(mainMarkup, "Current", MAIN_PAGE);
     const released = yearMarkupEntries.flatMap(({ markup, page }) =>
-      parseBannerRows(
-        markup,
-        page.includes("Former-") ? "Former" : "Banner",
-        page,
-      ),
+      parseYearPageBannerRows(markup, page),
     );
     const upcoming = upcomingMarkup
       ? parseBannerRows(upcomingMarkup.markup, "Upcoming", upcomingMarkup.page)
       : [];
-    const data = mergeBanners([...currentBanners, ...released], upcoming);
+    const data = mergeBanners(released, upcoming).filter(
+      isBannerInVisibleYearRange,
+    );
 
     return NextResponse.json({
       count: data.length,
       data,
       source: [
-        `https://arknights.wiki.gg/wiki/${MAIN_PAGE}`,
         ...yearMarkupEntries.map(
           ({ page }) => `https://arknights.wiki.gg/wiki/${page}`,
         ),
