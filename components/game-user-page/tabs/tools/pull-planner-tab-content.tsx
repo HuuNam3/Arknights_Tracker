@@ -4,7 +4,102 @@ import { AlertCircle, Diamond } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { TabsContent } from "@/components/ui/tabs";
+
+const MIN_WEEKLY_ANNIHILATION_ORUNDUM = 1200;
+const MAX_WEEKLY_ANNIHILATION_ORUNDUM = 1800;
+const WEEKLY_ANNIHILATION_ORUNDUM_STEP = 50;
+const COMMENDATION_ORUNDUM_BUNDLE_SIZE = 100;
+const COMMENDATION_PHASE_THREE_ORUNDUM_BUNDLE_SIZE = 30;
+const DISTINCTION_SHOP_BATCH_PERMITS = [1, 2, 5, 10, 20] as const;
+const WEEKDAY_LABELS = [
+  "Chủ nhật",
+  "Thứ 2",
+  "Thứ 3",
+  "Thứ 4",
+  "Thứ 5",
+  "Thứ 6",
+  "Thứ 7",
+] as const;
+
+const ORUNDUM_FARMING_SUGGESTIONS = [
+  {
+    title: "OP first-clear",
+    description:
+      "Clear stage mới hoặc stage còn sót để lấy Originite Prime lần đầu; nếu cần pull gấp có thể quy đổi 1 OP = 180 Orundum.",
+  },
+  {
+    title: "Challenge Mode OP",
+    description:
+      "Rà lại story/event stage có Challenge Mode chưa clear; mỗi CM thường cho thêm 1 OP để quy đổi khi thiếu pull.",
+  },
+  {
+    title: "Terminal event cũ",
+    description:
+      "Các event đã vào Terminal vẫn còn OP first-clear nếu bạn chưa đánh hết normal/ex/challenge stage.",
+  },
+  {
+    title: "Annihilation chưa clear",
+    description:
+      "Vào Annihilation kiểm tra map nào chưa lấy hết mốc first-clear; nếu còn thì đánh đủ mốc kill để nhận Orundum một lần.",
+  },
+  {
+    title: "Paradox Simulation",
+    description:
+      "Vào hồ sơ operator đã đủ điều kiện mở Paradox Simulation; clear lần đầu nhận 200 Orundum mỗi màn.",
+  },
+  {
+    title: "Tutorial / Training",
+    description:
+      "Rà lại các màn hướng dẫn, Training Grounds hoặc tutorial stage còn dấu thưởng; nếu chưa clear lần đầu thì vào lấy phần thưởng còn sót.",
+  },
+  {
+    title: "Distinction Store permit",
+    description:
+      "Yellow cert shop có Headhunting Permit và Ten-pull Permit reset theo tháng; mua đủ cả chuỗi khi có nhiều Distinction Certificate.",
+  },
+  {
+    title: "Monthly sign-in permit",
+    description:
+      "Lịch đăng nhập tháng thường có Headhunting Permit; nhớ claim đều vì đây là permit trực tiếp, không cần đổi Orundum.",
+  },
+  {
+    title: "Event shop permit",
+    description:
+      "Nhiều event shop bán Headhunting Permit bằng event currency, thường là nguồn permit dễ bỏ sót nếu chỉ farm vật liệu.",
+  },
+  {
+    title: "Limited-banner freebies",
+    description:
+      "Limited/Celebration banner hay có free daily pull, vé 10-pull riêng banner hoặc mini-game Orundum như mining/lucky strip.",
+  },
+  {
+    title: "Maintenance mail",
+    description:
+      "Nhận mail bồi thường bảo trì, lỗi hoặc downtime; phần thưởng thường là Orundum và có thể hết hạn nếu để quá lâu.",
+  },
+  {
+    title: "Web event / livestream",
+    description:
+      "Theo dõi web event, survey, livestream reward và redeem code vì đôi khi có Orundum, OP, permit hoặc mail quà.",
+  },
+  {
+    title: "Kernel permit",
+    description:
+      "Universal Certificate từ Kernel banner đổi được Kernel Headhunting Permit, nhưng chỉ dùng cho Kernel/rate-up tương ứng.",
+  },
+  {
+    title: "Paid pack permit",
+    description:
+      "Starter/Monthly Headhunting Pack có Ten-pull Permit; chỉ tính nếu bạn thật sự mua pack, không phải nguồn F2P.",
+  },
+  {
+    title: "Pro Enhancement Pack",
+    description:
+      "Nếu còn pack level mua bằng OP, pack trả Orundum ngang lượng OP quy đổi kèm vật liệu, thường tốt hơn đổi OP thẳng.",
+  },
+] as const;
 
 type PullPlannerTabContentProps = {
   TOOL_ICON_URLS: Record<string, string>;
@@ -13,6 +108,22 @@ type PullPlannerTabContentProps = {
   handlePullPlannerChange: (field: string, value: string | boolean) => void;
   plannerAnnihilationUndoneMaps: number;
   plannerCurrentLeftoverOrundum: number;
+  plannerCommendationShopBreakdown: Array<{
+    month: number;
+    orundum: number;
+    phase1OrundumBundles: number;
+    phase1Permits: number;
+    phase2Permits: number;
+    phase3Bundles: number;
+    permits: number;
+    spent: number;
+  }>;
+  plannerDistinctionShopBreakdown: Array<{
+    batches: number[];
+    month: number;
+    permits: number;
+    spent: number;
+  }>;
   plannerIntelligenceCertificates: number;
   plannerIntelligenceOrundum: number;
   plannerCurrentOrundum: number;
@@ -26,6 +137,8 @@ type PullPlannerTabContentProps = {
   plannerProjectedBannerPulls: number;
   plannerProjectedTransferableLeftoverOrundum: number;
   plannerProjectedTransferablePulls: number;
+  plannerReachableCommendationShopMonths: number;
+  plannerReachableDistinctionShopMonths: number;
   plannerReachableShopMonths: number;
   plannerShardOrundum: number;
   plannerShards: number;
@@ -51,6 +164,8 @@ export function PullPlannerTabContent({
   handlePullPlannerChange,
   plannerAnnihilationUndoneMaps,
   plannerCurrentLeftoverOrundum,
+  plannerCommendationShopBreakdown,
+  plannerDistinctionShopBreakdown,
   plannerIntelligenceCertificates,
   plannerIntelligenceOrundum,
   plannerCurrentOrundum,
@@ -64,6 +179,8 @@ export function PullPlannerTabContent({
   plannerProjectedBannerPulls,
   plannerProjectedTransferableLeftoverOrundum,
   plannerProjectedTransferablePulls,
+  plannerReachableCommendationShopMonths,
+  plannerReachableDistinctionShopMonths,
   plannerReachableShopMonths,
   plannerShardOrundum,
   plannerShards,
@@ -74,6 +191,21 @@ export function PullPlannerTabContent({
   pullPlannerTargets,
   selectedPullPlannerTarget,
 }: PullPlannerTabContentProps) {
+  const parsedWeeklyRegularOrundum = Number.parseInt(
+    pullPlanner.weeklyRegularOrundum,
+    10,
+  );
+  const normalizedWeeklyRegularOrundum = Number.isNaN(parsedWeeklyRegularOrundum)
+    ? MAX_WEEKLY_ANNIHILATION_ORUNDUM
+    : Math.min(
+        MAX_WEEKLY_ANNIHILATION_ORUNDUM,
+        Math.max(
+          MIN_WEEKLY_ANNIHILATION_ORUNDUM,
+          Math.round(parsedWeeklyRegularOrundum / WEEKLY_ANNIHILATION_ORUNDUM_STEP) *
+            WEEKLY_ANNIHILATION_ORUNDUM_STEP,
+        ),
+      );
+
   const plannerResourceInputs = [
     {
       field: "orundum",
@@ -108,6 +240,231 @@ export function PullPlannerTabContent({
       inputClassName: "border-violet-200 bg-white",
     },
   ] as const;
+
+  type WeeklyPullTimelineRow = {
+    detail: string;
+    orundum: number;
+    permits: number;
+    task: string;
+  };
+
+  const buildWeeklypullRows = (dayCount: number, includeWeeklyReset: boolean) =>
+    [
+      pullPlanner.dailyMissionEnabled
+        ? {
+            task: "Daily mission",
+            detail: `${dayCount} ngày x 100 = ${dayCount * 100} Orundum`,
+            orundum: dayCount * 100,
+            permits: 0,
+          }
+        : null,
+      includeWeeklyReset && pullPlanner.weeklyMissionEnabled
+        ? {
+            task: "Weekly mission",
+            detail: "Hoàn thành mốc tuần = 500 Orundum",
+            orundum: 500,
+            permits: 0,
+          }
+        : null,
+      includeWeeklyReset
+        ? {
+            task: "Annihilation weekly cap",
+            detail: `Lấy đủ cap tuần đang chọn = ${normalizedWeeklyRegularOrundum} Orundum`,
+            orundum: normalizedWeeklyRegularOrundum,
+            permits: 0,
+          }
+        : null,
+      pullPlanner.monthlyCardEnabled
+        ? {
+            task: "Monthly card",
+            detail: `${dayCount} ngày x 200 = ${dayCount * 200} Orundum`,
+            orundum: dayCount * 200,
+            permits: 0,
+          }
+        : null,
+    ].filter((row): row is WeeklyPullTimelineRow => row !== null);
+
+  const formatCommendationWeekDetail = (
+    breakdown: PullPlannerTabContentProps["plannerCommendationShopBreakdown"][number],
+  ) => {
+    const parts: string[] = [];
+
+    if (breakdown.phase1Permits > 0 || breakdown.phase1OrundumBundles > 0) {
+      const phase1Orundum =
+        breakdown.phase1OrundumBundles * COMMENDATION_ORUNDUM_BUNDLE_SIZE;
+      parts.push(
+        `P1: ${breakdown.phase1Permits} permit${
+          phase1Orundum > 0 ? ` + ${phase1Orundum} Orundum` : ""
+        }`,
+      );
+    }
+
+    if (breakdown.phase2Permits > 0) {
+      parts.push(`P2: ${breakdown.phase2Permits} permit`);
+    }
+
+    if (breakdown.phase3Bundles > 0) {
+      parts.push(
+        `P3: ${
+          breakdown.phase3Bundles * COMMENDATION_PHASE_THREE_ORUNDUM_BUNDLE_SIZE
+        } Orundum`,
+      );
+    }
+
+    const totalOrundum = breakdown.orundum + breakdown.permits * 600;
+
+    return `Kỳ ${breakdown.month}: ${parts.join(" | ") || "không có mục mua"}; tốn ${
+      breakdown.spent
+    } cert; quy đổi ${totalOrundum} Orundum = ${Math.floor(totalOrundum / 600)} pull${
+      totalOrundum % 600 > 0 ? ` + dư ${totalOrundum % 600} Orundum` : ""
+    }`;
+  };
+
+  const formatDistinctionWeekDetail = (
+    breakdown: PullPlannerTabContentProps["plannerDistinctionShopBreakdown"][number],
+  ) => {
+    const batches = breakdown.batches
+      .map((count, index) => {
+        const permits = DISTINCTION_SHOP_BATCH_PERMITS[index] ?? 0;
+
+        return count > 0 ? `${permits} permit x${count}` : null;
+      })
+      .filter((value): value is string => value !== null)
+      .join(" | ");
+    const totalOrundum = breakdown.permits * 600;
+
+    return `Kỳ ${breakdown.month}: ${batches || `${breakdown.permits} permit`}; tốn ${
+      breakdown.spent
+    } cert; quy đổi ${totalOrundum} Orundum = ${breakdown.permits} pull`;
+  };
+
+  const plannerToday = new Date();
+  const getLocalDayOffset = (value: Date) => {
+    const todayMidnight = new Date(
+      plannerToday.getFullYear(),
+      plannerToday.getMonth(),
+      plannerToday.getDate(),
+    ).getTime();
+    const valueMidnight = new Date(
+      value.getFullYear(),
+      value.getMonth(),
+      value.getDate(),
+    ).getTime();
+
+    return Math.round((valueMidnight - todayMidnight) / (24 * 60 * 60 * 1000));
+  };
+  const getShopMonthOffsets = (currentMonthClaimed: boolean, monthCount: number) => {
+    if (monthCount <= 0) return [];
+
+    const offsets: number[] = [];
+    if (!currentMonthClaimed) {
+      offsets.push(0);
+    }
+
+    let cursor = new Date(plannerToday.getFullYear(), plannerToday.getMonth() + 1, 1);
+    while (offsets.length < monthCount) {
+      const offset = getLocalDayOffset(cursor);
+      if (offset > plannerDaysUntilBanner) break;
+
+      offsets.push(offset);
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+
+    return offsets;
+  };
+  const commendationShopMonthOffsets = getShopMonthOffsets(
+    pullPlanner.commendationShopCurrentMonthClaimed,
+    plannerReachableCommendationShopMonths,
+  );
+  const distinctionShopMonthOffsets = getShopMonthOffsets(
+    pullPlanner.distinctionShopCurrentMonthClaimed,
+    plannerReachableDistinctionShopMonths,
+  );
+  const buildWeekRangeNote = (startOffset: number, dayCount: number) => {
+    const start = new Date(plannerToday);
+    start.setDate(plannerToday.getDate() + startOffset);
+    const end = new Date(start);
+    end.setDate(start.getDate() + dayCount - 1);
+
+    if (dayCount === 1) {
+      return startOffset === 0
+        ? `${WEEKDAY_LABELS[start.getDay()]} hôm nay`
+        : `${WEEKDAY_LABELS[start.getDay()]} (1 ngày)`;
+    }
+
+    return `${WEEKDAY_LABELS[start.getDay()]} - ${WEEKDAY_LABELS[end.getDay()]} (${dayCount} ngày)`;
+  };
+
+  let weeklypullTimelineRemainingDays = Math.max(0, plannerDaysUntilBanner);
+  let weeklypullTimelineStartOffset = 0;
+  const weeklypullTimeline: Array<{
+    label: string;
+    note: string;
+    orundum: number;
+    permits: number;
+    rows: WeeklyPullTimelineRow[];
+  }> = [];
+
+  while (weeklypullTimelineRemainingDays > 0) {
+    const segmentStart = new Date(plannerToday);
+    segmentStart.setDate(plannerToday.getDate() + weeklypullTimelineStartOffset);
+    const segmentStartDay = segmentStart.getDay();
+    const daysUntilNextMonday = segmentStartDay === 0 ? 1 : 8 - segmentStartDay;
+    const dayCount = Math.min(weeklypullTimelineRemainingDays, daysUntilNextMonday);
+    const rows = buildWeeklypullRows(dayCount, true);
+    const segmentEndOffset = weeklypullTimelineStartOffset + dayCount - 1;
+    const isLastSegment = weeklypullTimelineRemainingDays === dayCount;
+
+    commendationShopMonthOffsets.forEach((offset, index) => {
+      const isInSegment =
+        offset >= weeklypullTimelineStartOffset &&
+        (offset <= segmentEndOffset || (isLastSegment && offset === plannerDaysUntilBanner));
+      const breakdown = plannerCommendationShopBreakdown[index];
+      if (!isInSegment || !breakdown || breakdown.spent <= 0) return;
+
+      rows.push({
+        task: "Commendation shop",
+        detail: formatCommendationWeekDetail(breakdown),
+        orundum: breakdown.orundum,
+        permits: breakdown.permits,
+      });
+    });
+
+    distinctionShopMonthOffsets.forEach((offset, index) => {
+      const isInSegment =
+        offset >= weeklypullTimelineStartOffset &&
+        (offset <= segmentEndOffset || (isLastSegment && offset === plannerDaysUntilBanner));
+      const breakdown = plannerDistinctionShopBreakdown[index];
+      if (!isInSegment || !breakdown || breakdown.spent <= 0) return;
+
+      rows.push({
+        task: "Distinction shop",
+        detail: formatDistinctionWeekDetail(breakdown),
+        orundum: 0,
+        permits: breakdown.permits,
+      });
+    });
+
+    const orundum = rows.reduce((sum, row) => sum + row.orundum, 0);
+    const permits = rows.reduce((sum, row) => sum + row.permits, 0);
+
+    weeklypullTimeline.push({
+      label: `Tuần ${weeklypullTimeline.length + 1}`,
+      note: buildWeekRangeNote(weeklypullTimelineStartOffset, dayCount),
+      rows,
+      orundum,
+      permits,
+    });
+
+    weeklypullTimelineRemainingDays -= dayCount;
+    weeklypullTimelineStartOffset += dayCount;
+  }
+  const weeklypullTimelineTotalOrundum = weeklypullTimeline.reduce(
+    (sum, week) => sum + week.orundum + week.permits * 600,
+    0,
+  );
+  const weeklypullTimelineTotalPulls = Math.floor(weeklypullTimelineTotalOrundum / 600);
+  const weeklypullTimelineLeftoverOrundum = weeklypullTimelineTotalOrundum % 600;
 
   return (
     <TabsContent value="pull-planner" className="mt-0 focus-visible:outline-none">
@@ -182,7 +539,6 @@ export function PullPlannerTabContent({
                   placeholder={label}
                   className={`rounded-xl ${inputClassName}`}
                 />
-                <p className="text-[11px] leading-4 text-slate-500">{note}</p>
               </div>
               ),
             )}
@@ -207,9 +563,6 @@ export function PullPlannerTabContent({
                 placeholder="Commendations"
                 className="rounded-xl border-lime-200 bg-white"
               />
-              <p className="text-[11px] leading-4 text-slate-500">
-                Tính phần mua roll trong Commendation shop
-              </p>
               <div className="grid grid-cols-3 gap-1">
                 {([
                   ["phase1", "P1"],
@@ -232,7 +585,7 @@ export function PullPlannerTabContent({
               </div>
               <p className="text-[11px] leading-4 text-slate-500">
                 {pullPlanner.commendationShopMode === "phase1"
-                  ? "Chỉ lấy phần roll ở Phase 1 mỗi tháng."
+                  ? "Chỉ lấy phần pull ở Phase 1 mỗi tháng."
                   : pullPlanner.commendationShopMode === "phase2"
                     ? "Nếu đủ clear shop tháng đó, planner sẽ xuống Phase 2 để lấy thêm permit."
                     : "Nếu đủ clear hết Phase 1 và 2, phần cert dư sẽ đổi Orundum ở Phase 3."}
@@ -259,9 +612,6 @@ export function PullPlannerTabContent({
                 placeholder="Distinctions"
                 className="rounded-xl border-yellow-200 bg-white"
               />
-              <p className="text-[11px] leading-4 text-slate-500">
-                Tính permit mua được trong Distinction shop
-              </p>
             </div>
 
             <div className="space-y-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 shadow-sm">
@@ -286,28 +636,30 @@ export function PullPlannerTabContent({
                 placeholder="Intelligence Certificate"
                 className="rounded-xl border-rose-200 bg-white"
               />
-              <p className="text-[11px] leading-4 text-slate-500">
-                Orundum in Stock: 20 cert = 100 Orundum
-              </p>
             </div>
 
             <div className="space-y-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 shadow-sm">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-slate-800">Annihilation mỗi tuần</p>
+                <Badge variant="outline" className="border-sky-200 bg-white text-sky-700">
+                  {normalizedWeeklyRegularOrundum}
+                </Badge>
               </div>
-              <Input
-                type="number"
-                min={0}
-                max={1800}
-                value={pullPlanner.weeklyRegularOrundum}
-                onChange={(e) => handlePullPlannerChange("weeklyRegularOrundum", e.target.value)}
-                placeholder="0 - 1800"
-                className="rounded-xl border-sky-200 bg-white"
+              <Slider
+                min={MIN_WEEKLY_ANNIHILATION_ORUNDUM}
+                max={MAX_WEEKLY_ANNIHILATION_ORUNDUM}
+                step={WEEKLY_ANNIHILATION_ORUNDUM_STEP}
+                value={[normalizedWeeklyRegularOrundum]}
+                onValueChange={([value]) =>
+                  handlePullPlannerChange("weeklyRegularOrundum", `${value}`)
+                }
+                className="py-2 bg-cyan-300"
               />
-              <p className="text-[11px] leading-4 text-slate-500">
-                Nhập lượng Orundum mỗi tuần bạn chắc chắn lấy được, tối đa 1800.
-              </p>
-            </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>{MIN_WEEKLY_ANNIHILATION_ORUNDUM}</span>
+                <span>{MAX_WEEKLY_ANNIHILATION_ORUNDUM}</span>
+              </div>
+              </div>
           </div>
         </div>
 
@@ -362,6 +714,52 @@ export function PullPlannerTabContent({
             </label>
           ))}
 
+          <label className="flex items-center gap-3 rounded-xl border border-lime-100 bg-white p-4">
+            <input
+              type="checkbox"
+              checked={pullPlanner.commendationShopCurrentMonthClaimed}
+              onChange={(e) =>
+                handlePullPlannerChange(
+                  "commendationShopCurrentMonthClaimed",
+                  e.target.checked,
+                )
+              }
+              className="size-4 accent-lime-600"
+            />
+            <div>
+              <p className="font-semibold text-slate-800">Đã đổi Commendation tháng này</p>
+              <p className="text-sm text-slate-500">
+                Bỏ qua kỳ shop hiện tại nếu bạn đã đổi permit/Orundum tháng này.
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Planner sẽ chỉ tính {plannerReachableCommendationShopMonths} kỳ Commendation còn lại.
+              </p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 rounded-xl border border-yellow-100 bg-white p-4">
+            <input
+              type="checkbox"
+              checked={pullPlanner.distinctionShopCurrentMonthClaimed}
+              onChange={(e) =>
+                handlePullPlannerChange(
+                  "distinctionShopCurrentMonthClaimed",
+                  e.target.checked,
+                )
+              }
+              className="size-4 accent-yellow-600"
+            />
+            <div>
+              <p className="font-semibold text-slate-800">Đã đổi Distinction tháng này</p>
+              <p className="text-sm text-slate-500">
+                Bỏ qua kỳ shop hiện tại nếu bạn đã mua permit bằng yellow cert tháng này.
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Planner sẽ chỉ tính {plannerReachableDistinctionShopMonths} kỳ Distinction còn lại.
+              </p>
+            </div>
+          </label>
+
           <label className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4">
             <input
               type="checkbox"
@@ -372,130 +770,69 @@ export function PullPlannerTabContent({
             />
             <div>
               <p className="font-semibold text-slate-800">Đổi shop sự kiện</p>
-              <p className="text-sm text-slate-500">Event thường 3 roll, limit/collab 5 roll</p>
+              <p className="text-sm text-slate-500">Event thường 3 pull, limit/collab 5 pull</p>
               <p className="mt-1 text-xs text-slate-400">
-                Bật nếu bạn sẽ farm đủ currency để lấy phần roll trong shop sự kiện.
+                Bật nếu bạn sẽ farm đủ currency để lấy phần pull trong shop sự kiện.
               </p>
             </div>
           </label>
-
-          <div className="rounded-xl border border-slate-100 bg-white p-4">
-            <div className="hidden">
-            <p className="mb-2 font-semibold text-slate-800">Annihilation mỗi tuần</p>
-            <Input
-              type="number"
-              min={0}
-              max={1800}
-              value={pullPlanner.weeklyRegularOrundum}
-              onChange={(e) => handlePullPlannerChange("weeklyRegularOrundum", e.target.value)}
-              placeholder="0 - 1800"
-              className="rounded-xl border-slate-200 bg-white"
-            />
-            <p className="mt-2 text-xs text-slate-500">
-              Nhập lượng Orundum mỗi tuần bạn chắc chắn lấy được, tối đa 1800.
-            </p>
-            </div>
-            <div className="pt-0">
-              <p className="mb-2 font-semibold text-slate-800">Map Annihilation chưa đánh</p>
-              <Input
-                type="number"
-                min={0}
-                value={pullPlanner.annihilationUndoneMaps}
-                onChange={(e) =>
-                  handlePullPlannerChange("annihilationUndoneMaps", e.target.value)
-                }
-                placeholder="Số map chưa clear lần đầu"
-                className="rounded-xl border-slate-200 bg-white"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                Tính 1500 Orundum cho mỗi map Annihilation chưa clear lần đầu.
-              </p>
-            </div>
-          </div>
         </div>
 
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="font-semibold text-slate-800">Chi tiet nguon tich luy truoc banner</p>
-            <Badge variant="outline" className="border-slate-200 bg-white text-slate-600">
-              {plannerReachableShopMonths} ky shop truoc banner
-            </Badge>
+            <p className="font-semibold text-slate-800">Chi tiết tích pull đến banner bạn muốn</p>
           </div>
-          <div className="space-y-2 rounded-xl border border-slate-100 bg-white px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-medium text-slate-800">Tài nguyên hiện tại</p>
-              <p className="whitespace-nowrap text-xs text-slate-600">{plannerCurrentPulls} pull hiện có</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 md:grid-cols-5">
-              <div className={getPlannerResourceCardClassName("Orundum")}>
-                <p className="text-slate-500">Orundum</p>
-                <p className="font-semibold text-slate-800">{plannerOrundum}</p>
-                <p className="mt-1 text-slate-500">= {Math.floor(plannerOrundum / 600)} pull</p>
-              </div>
-              <div className={getPlannerResourceCardClassName("Originite Prime")}>
-                <p className="text-slate-500">Originite Prime</p>
-                <p className="font-semibold text-slate-800">{plannerPrime} OP = {plannerPrime * 180} Orundum</p>
-                <p className="mt-1 text-slate-500">
-                  = {Math.floor((plannerPrime * 180) / 600)} pull
-                </p>
-              </div>
-              <div className={getPlannerResourceCardClassName("Headhunting Permit")}>
-                <p className="text-slate-500">Headhunting Permit</p>
-                <p className="font-semibold text-slate-800">{plannerPermits} permit</p>
-                <p className="mt-1 text-slate-500">= {plannerPermits} pull</p>
-              </div>
-              <div className={getPlannerResourceCardClassName("Originium Shard")}>
-                <p className="text-slate-500">Originium Shard</p>
-                <p className="font-semibold text-slate-800">
-                  {plannerShards} shard = {plannerShardOrundum} Orundum
-                </p>
-                <p className="mt-1 text-slate-500">
-                  = {Math.floor(plannerShardOrundum / 600)} pull
-                </p>
-              </div>
-              <div className={getPlannerResourceCardClassName("Intelligence Certificate")}>
-                <p className="text-slate-500">Intelligence Certificate</p>
-                <p className="font-semibold text-slate-800">
-                  {plannerIntelligenceCertificates} cert = {plannerIntelligenceOrundum} Orundum
-                </p>
-                <p className="mt-1 text-slate-500">
-                  = {Math.floor(plannerIntelligenceOrundum / 600)} pull
+          <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-slate-800">Các tuần tích pull đều đặn</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Liệt kê từng tuần từ hôm nay tới banner; shop, permit sự kiện và quà không đều sẽ nằm ở bảng bên dưới.
                 </p>
               </div>
             </div>
-            <p className="text-xs text-slate-500">
-              Tổng quy đổi hiện tại: {plannerCurrentOrundum} Orundum + {plannerPermits} permit,
-              còn dư {plannerCurrentLeftoverOrundum} Orundum sau quy đổi pull.
-            </p>
-          </div>
-          <div className="space-y-2">
-            {plannerStableBreakdown.map((source) => (
-              <div
-                key={`${source.label}-${source.detail}`}
-                className={getPlannerSourceCardClassName(source.label)}
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-slate-800">{source.label}</p>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        source.scope === "target-only"
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-sky-100 text-sky-700"
-                      }`}
-                    >
-                      {source.scope === "target-only" ? "Chỉ banner target" : "Mang sang được"}
-                    </span>
+            <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
+              {weeklypullTimeline.length > 0 ? (
+                weeklypullTimeline.map((week) => {
+                  const weeklyTotalOrundum = week.orundum + week.permits * 600;
+
+                  return (
+                  <div key={week.label} className="rounded-lg border border-white bg-white/80 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-slate-800">{week.label}</p>
+                        <p className="mt-1 text-xs text-slate-500">{week.note}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 space-y-1 text-xs text-slate-600">
+                      {week.rows.map((row) => (
+                        <div key={`${week.label}-${row.task}`} className="flex justify-between gap-3">
+                          <span>{row.task}</span>
+                          <span className="text-right">{row.detail}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 border-t border-cyan-100 pt-2 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-slate-800">Tổng tuần</span>
+                        <span className="text-right font-semibold text-cyan-700">
+                          {weeklyTotalOrundum} Orundum ={" "}
+                          {Math.floor(weeklyTotalOrundum / 600)} pull
+                          {weeklyTotalOrundum % 600 > 0
+                            ? ` + dư ${weeklyTotalOrundum % 600} Orundum`
+                            : ""}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500">{source.detail}</p>
-                </div>
-                <div className="whitespace-nowrap text-right text-xs text-slate-600">
-                  <p>+{source.orundum} Orundum</p>
-                  <p>+{source.permits} permit</p>
-                  {source.freePulls > 0 ? <p>+{source.freePulls} free pull</p> : null}
-                </div>
-              </div>
-            ))}
+                  );
+                })
+              ) : (
+                <p className="rounded-lg border border-white bg-white/80 p-3 text-sm text-slate-500">
+                  Banner đã quá gần hoặc chưa có ngày để chia tuần tích pull.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -503,52 +840,73 @@ export function PullPlannerTabContent({
           <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Pull hiện có</p>
             <p className="mt-1 text-2xl font-black text-slate-800">{plannerCurrentPulls}</p>
-            <p className="mt-2 text-xs text-slate-500">Từ kho hiện tại, chưa tính phần farm thêm.</p>
+            <div className="mt-2 space-y-1 text-xs text-slate-500">
+              <p>Orundum đang có: {plannerOrundum} = {Math.floor(plannerOrundum / 600)} pull.</p>
+              <p>Originite Prime: {plannerPrime} OP = {plannerPrime * 180} Orundum.</p>
+              <p>Headhunting Permit: {plannerPermits} permit = {plannerPermits} pull.</p>
+              <p>Originium Shard: {plannerShards} shard = {plannerShardOrundum} Orundum.</p>
+              <p>
+                Intelligence Certificate: {plannerIntelligenceCertificates} cert ={" "}
+                {plannerIntelligenceOrundum} Orundum.
+              </p>
+              <p className="font-semibold text-slate-700">
+                Tổng quy đổi: {plannerCurrentOrundum} Orundum + {plannerPermits} permit,
+                còn dư {plannerCurrentLeftoverOrundum} Orundum.
+              </p>
+            </div>
           </div>
           <div className="rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-cyan-50 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-500">Pull mang sang được</p>
-            <p className="mt-1 text-2xl font-black text-sky-700">{plannerProjectedTransferablePulls}</p>
-            <p className="mt-2 text-xs text-slate-500">
-              Bao gồm Orundum/permit tích trữ tới banner, còn dư {plannerProjectedTransferableLeftoverOrundum} Orundum sau quy đổi.
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Pull tích được trong {weeklypullTimeline.length} tuần
             </p>
+            <p className="mt-1 text-2xl font-black text-sky-700">{weeklypullTimelineTotalPulls}</p>
+            <div className="mt-2 space-y-1 text-xs text-slate-500">
+              <p>
+                Lấy tổng từ các dòng <span className="font-semibold">Tổng tuần</span> trong bảng chi tiết phía trên.
+              </p>
+              <p>
+                Mỗi permit trong Commendation/Distinction/event được quy đổi thành 600 Orundum trước khi cộng.
+              </p>
+              <p>
+                Tổng tích theo tuần: {weeklypullTimelineTotalOrundum} Orundum ={" "}
+                {weeklypullTimelineTotalPulls} pull
+                {weeklypullTimelineLeftoverOrundum > 0
+                  ? ` + dư ${weeklypullTimelineLeftoverOrundum} Orundum`
+                  : ""}.
+              </p>
+              <p>Không cộng tài nguyên đang có sẵn trong kho của bạn.</p>
+            </div>
           </div>
           <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-500">Tổng dùng trên banner target</p>
+            <p className="text-xs font-semibold uppercase text-slate-500">Pull dự kiến khi đến banner</p>
             <p className="mt-1 text-2xl font-black text-amber-600">{plannerProjectedBannerPulls}</p>
-            <p className="mt-2 text-xs text-slate-500">
-              Gồm {plannerProjectedTransferablePulls} pull mang sang được + {plannerTargetOnlyPulls} pull khóa trên banner target, còn dư {plannerProjectedBannerLeftoverOrundum} Orundum quy đổi.
-            </p>
+            <div className="mt-2 space-y-1 text-xs text-slate-500">
+              <p>Đây là số pull dự kiến dùng được khi banner bắt đầu.</p>
+              <p>
+                Gồm {plannerCurrentPulls} pull hiện có + phần tích lũy tới banner +{" "}
+                {plannerTargetOnlyPulls} pull khóa riêng trên banner target.
+              </p>
+              <p>
+                Pull tích lũy có thể bao gồm daily, weekly, Annihilation, monthly card, sign-in,
+                shop cert, event shop và quà sự kiện nếu bạn bật các mục đó.
+              </p>
+              <p className="font-semibold text-slate-700">
+                Sau quy đổi còn dư {plannerProjectedBannerLeftoverOrundum} Orundum.
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="font-semibold text-slate-800">Gợi ý kiếm thêm Orundum</p>
-          <div className="mt-3 space-y-2 text-sm text-slate-600">
-            <p>
-              <span className="font-semibold text-slate-800">Paradox Simulation:</span> vào hồ sơ
-              operator đủ điều kiện mở Paradox Simulation, clear lần đầu để nhận 200 Orundum mỗi
-              màn. Nguồn này không tự dự đoán theo thời gian, nên khi nhận xong bạn cộng tay vào ô
-              Orundum hiện có.
-            </p>
-            <p>
-              <span className="font-semibold text-slate-800">Orundum in Stock:</span> là gói
-              Orundum trong <span className="font-semibold">Store &gt; Certificate &gt; Intelligence</span>.
-              Bạn dùng Intelligence Certificate kiếm từ rerun event để đổi; planner này đang tính
-              theo tỷ lệ 20 cert = 100 Orundum.
-            </p>
-            <p>
-              <span className="font-semibold text-slate-800">Annihilation chưa clear:</span> nếu
-              còn map Annihilation chưa đánh lần đầu, nhập số map vào ô phía trên để planner cộng
-              thêm 1500 Orundum mỗi map.
-            </p>
+          <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+            {ORUNDUM_FARMING_SUGGESTIONS.map(({ title, description }) => (
+              <p key={title} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <span className="font-semibold text-slate-800">{title}:</span> {description}
+              </p>
+            ))}
           </div>
         </div>
-
-        <p className="text-sm text-slate-500">
-          {selectedPullPlannerTarget
-            ? `Tính từ hôm nay tới ${selectedPullPlannerTarget.name} còn ${plannerDaysUntilBanner} ngày, tương đương ${plannerWeeksUntilBanner} tuần tròn và xấp xỉ ${plannerMonthsUntilBanner.toFixed(1)} tháng để cộng nguồn ổn định. Pull "mang sang được" là số an toàn để quyết định save; free pull hoặc vé khóa banner chỉ được cộng ở ô tổng dùng trên banner target.`
-            : "Chọn một banner tương lai để bắt đầu tính."}
-        </p>
       </div>
     </TabsContent>
   );

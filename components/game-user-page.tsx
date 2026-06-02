@@ -1058,10 +1058,12 @@ type CommendationShopMode = "phase1" | "phase2" | "phase3";
 type PullPlannerState = {
   annihilationUndoneMaps: string;
   commendations: string;
+  commendationShopCurrentMonthClaimed: boolean;
   commendationShopMode: CommendationShopMode;
   currentBannerKey: string;
   dailyMissionEnabled: boolean;
   distinctions: string;
+  distinctionShopCurrentMonthClaimed: boolean;
   eventRewardsEnabled: boolean;
   eventShopEnabled: boolean;
   intelligenceCertificates: string;
@@ -1285,6 +1287,9 @@ const TIER_DRAFT_KEY = "arkreview_tierlist_draft_v1";
 const TIER_LISTS_KEY = "arkreview_tierlists_v1";
 const LIMITED_LUCKY_BOARD_EXPECTED_ORUNDUM = 8170;
 const ANNIHILATION_FIRST_CLEAR_ORUNDUM_PER_MAP = 1500;
+const MIN_WEEKLY_ANNIHILATION_ORUNDUM = 1200;
+const MAX_WEEKLY_ANNIHILATION_ORUNDUM = 1800;
+const WEEKLY_ANNIHILATION_ORUNDUM_STEP = 50;
 const COMMENDATION_SHOP_MONTHLY_PERMITS = 2;
 const DAILY_SIGNIN_PERMIT_DAY = 17;
 const INTELLIGENCE_CERTIFICATE_ORUNDUM_COST = 20;
@@ -1309,10 +1314,12 @@ const DISTINCTION_SHOP_BATCHES = [
 const DEFAULT_PULL_PLANNER: PullPlannerState = {
   annihilationUndoneMaps: "0",
   commendations: "0",
+  commendationShopCurrentMonthClaimed: false,
   commendationShopMode: "phase1",
   currentBannerKey: "",
   dailyMissionEnabled: false,
   distinctions: "0",
+  distinctionShopCurrentMonthClaimed: false,
   eventRewardsEnabled: false,
   eventShopEnabled: false,
   intelligenceCertificates: "0",
@@ -1466,6 +1473,10 @@ const hydratePullPlannerState = (value: unknown): PullPlannerState | null => {
       typeof candidate.commendations === "string"
         ? candidate.commendations
         : DEFAULT_PULL_PLANNER.commendations,
+    commendationShopCurrentMonthClaimed:
+      typeof candidate.commendationShopCurrentMonthClaimed === "boolean"
+        ? candidate.commendationShopCurrentMonthClaimed
+        : DEFAULT_PULL_PLANNER.commendationShopCurrentMonthClaimed,
     commendationShopMode:
       candidate.commendationShopMode === "phase1" ||
       candidate.commendationShopMode === "phase2" ||
@@ -1484,6 +1495,10 @@ const hydratePullPlannerState = (value: unknown): PullPlannerState | null => {
       typeof candidate.distinctions === "string"
         ? candidate.distinctions
         : DEFAULT_PULL_PLANNER.distinctions,
+    distinctionShopCurrentMonthClaimed:
+      typeof candidate.distinctionShopCurrentMonthClaimed === "boolean"
+        ? candidate.distinctionShopCurrentMonthClaimed
+        : DEFAULT_PULL_PLANNER.distinctionShopCurrentMonthClaimed,
     eventRewardsEnabled:
       typeof candidate.eventRewardsEnabled === "boolean"
         ? candidate.eventRewardsEnabled
@@ -2797,14 +2812,30 @@ export function GameUserPage({
     plannerTodayTs,
     plannerTargetTs,
   );
+  const plannerReachableCommendationShopMonths = Math.max(
+    0,
+    plannerReachableShopMonths -
+      (pullPlanner.commendationShopCurrentMonthClaimed ? 1 : 0),
+  );
+  const plannerReachableDistinctionShopMonths = Math.max(
+    0,
+    plannerReachableShopMonths -
+      (pullPlanner.distinctionShopCurrentMonthClaimed ? 1 : 0),
+  );
   const plannerReachableSignInPermits = countReachableMonthlyDay(
     plannerTodayTs,
     plannerTargetTs,
     DAILY_SIGNIN_PERMIT_DAY,
   );
   const plannerWeeklyRegularOrundum = Math.min(
-    1800,
-    Math.max(0, parseNumberInput(pullPlanner.weeklyRegularOrundum)),
+    MAX_WEEKLY_ANNIHILATION_ORUNDUM,
+    Math.max(
+      MIN_WEEKLY_ANNIHILATION_ORUNDUM,
+      Math.round(
+        parseNumberInput(pullPlanner.weeklyRegularOrundum) /
+          WEEKLY_ANNIHILATION_ORUNDUM_STEP,
+      ) * WEEKLY_ANNIHILATION_ORUNDUM_STEP,
+    ),
   );
   const plannerFutureDailyOrundum = pullPlanner.dailyMissionEnabled
     ? plannerDaysUntilBanner * 100
@@ -2890,12 +2921,12 @@ export function GameUserPage({
       : [];
   const plannerCommendationShopPurchases = calculateCommendationShopPurchases(
     plannerCommendations,
-    plannerReachableShopMonths,
+    plannerReachableCommendationShopMonths,
     plannerCommendationShopMode,
   );
   const plannerDistinctionShopPurchases = calculateDistinctionShopPurchases(
     plannerDistinctions,
-    plannerReachableShopMonths,
+    plannerReachableDistinctionShopMonths,
   );
   const plannerFutureCommendationShopOrundum =
     plannerCommendationShopPurchases.orundum;
@@ -3052,7 +3083,7 @@ export function GameUserPage({
       : null,
     plannerCommendationShopPurchases.spent > 0
       ? {
-          detail: `${plannerCommendationShopPurchases.spent}/${plannerCommendations} cert (${plannerCommendationShopModeLabel}, ${plannerReachableShopMonths} kỳ) = ${formatCombinedPullSummary(
+          detail: `${plannerCommendationShopPurchases.spent}/${plannerCommendations} cert (${plannerCommendationShopModeLabel}, ${plannerReachableCommendationShopMonths} kỳ) = ${formatCombinedPullSummary(
             plannerFutureCommendationShopOrundum,
             plannerFutureCommendationShopPermits,
           )}, dư ${plannerCommendationShopPurchases.remaining} cert. ${formatCommendationMonthBreakdown(
@@ -3067,7 +3098,7 @@ export function GameUserPage({
       : null,
     plannerDistinctionShopPurchases.spent > 0
       ? {
-          detail: `${plannerDistinctionShopPurchases.spent}/${plannerDistinctions} cert (${plannerDistinctionShopPurchases.monthsUsed}/${plannerReachableShopMonths} kỳ) = ${formatCombinedPullSummary(
+          detail: `${plannerDistinctionShopPurchases.spent}/${plannerDistinctions} cert (${plannerDistinctionShopPurchases.monthsUsed}/${plannerReachableDistinctionShopMonths} kỳ) = ${formatCombinedPullSummary(
             0,
             plannerFutureDistinctionShopPermits,
           )}, dư ${plannerDistinctionShopPurchases.remaining} cert. ${formatDistinctionMonthBreakdown(
@@ -4079,7 +4110,11 @@ export function GameUserPage({
                     getPlannerResourceCardClassName,
                     getPlannerSourceCardClassName,
                     handlePullPlannerChange,
+                    plannerCommendationShopBreakdown:
+                      plannerCommendationShopPurchases.breakdown,
                     plannerCurrentLeftoverOrundum,
+                    plannerDistinctionShopBreakdown:
+                      plannerDistinctionShopPurchases.breakdown,
                     plannerIntelligenceCertificates,
                     plannerIntelligenceOrundum,
                     plannerCurrentOrundum,
@@ -4093,6 +4128,8 @@ export function GameUserPage({
                     plannerProjectedBannerPulls,
                     plannerProjectedTransferableLeftoverOrundum,
                     plannerProjectedTransferablePulls,
+                    plannerReachableCommendationShopMonths,
+                    plannerReachableDistinctionShopMonths,
                     plannerReachableShopMonths,
                     plannerShardOrundum,
                     plannerShards,
