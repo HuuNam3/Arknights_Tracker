@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Plus, Search, Trophy, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, Heart, Plus, Search, Star, Trophy, X } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -14,20 +15,26 @@ import { Input } from "@/components/ui/input";
 import { TabsContent } from "@/components/ui/tabs";
 
 type TierListTabContentProps = {
+  currentUid: string;
   getTierBadgeClassName: (tier: string) => string;
   handleAddTier: () => void;
   handleAssignOperatorToTier: (operatorName: string, tier: string) => void;
-  handleDeleteSavedTierList: (id: string) => void;
+  handleDeleteSavedTierList: (id: string, source?: "public" | "local") => void;
   handleDeleteTier: (tier: string) => void;
-  handleLoadSavedTierListToEditor: (tierList: any) => void;
+  handleLoadSavedTierListToEditor: (tierList: any, source?: "public" | "local") => void;
   handleMoveTier: (index: number, direction: number) => void;
-  handleOpenSavedTierList: (tierList: any) => void;
-  handleSaveTierList: () => void;
+  handleOpenSavedTierList: (tierList: any, source?: "public" | "local") => void;
+  handleResetTierListEditor: () => void;
+  handleSaveTierList: (target?: "public" | "local") => void;
+  handleToggleSavedTierListLike: (tierListId: string) => void;
+  isTierListLoading: boolean;
+  localTierLists: any[];
   newTierName: string;
   paginatedTierPoolCandidates: any[];
   savedTierLists: any[];
   selectedTierBoard: Array<{ operators: any[]; tier: string }>;
   selectedTierList: any | null;
+  selectedTierListSource: "public" | "local";
   setNewTierName: (value: string) => void;
   setTierAssignments: (value: Record<string, string>) => void;
   setTierListName: (value: string) => void;
@@ -38,6 +45,8 @@ type TierListTabContentProps = {
   tierAssignments: Record<string, string>;
   tierBoard: Array<{ operators: any[]; tier: string }>;
   tierListName: string;
+  tierListNameIssue: string;
+  tierListNameMaxLength: number;
   tierListView: string;
   tierOrder: string[];
   tierPoolPage: number;
@@ -51,6 +60,7 @@ type TierListTabContentProps = {
 };
 
 export function TierListTabContent({
+  currentUid,
   getTierBadgeClassName,
   handleAddTier,
   handleAssignOperatorToTier,
@@ -59,12 +69,17 @@ export function TierListTabContent({
   handleLoadSavedTierListToEditor,
   handleMoveTier,
   handleOpenSavedTierList,
+  handleResetTierListEditor,
   handleSaveTierList,
+  handleToggleSavedTierListLike,
+  isTierListLoading,
+  localTierLists,
   newTierName,
   paginatedTierPoolCandidates,
   savedTierLists,
   selectedTierBoard,
   selectedTierList,
+  selectedTierListSource,
   setNewTierName,
   setTierAssignments,
   setTierListName,
@@ -74,6 +89,8 @@ export function TierListTabContent({
   setTierStarFilter,
   tierBoard,
   tierListName,
+  tierListNameIssue,
+  tierListNameMaxLength,
   tierListView,
   tierOrder,
   tierPoolPage,
@@ -85,6 +102,91 @@ export function TierListTabContent({
   TierAssignmentAvatar,
   TierOperatorAvatar,
 }: TierListTabContentProps) {
+  const [selectedTierSearch, setSelectedTierSearch] = useState("");
+  const [savedTierListPage, setSavedTierListPage] = useState(1);
+  const normalizedSelectedTierSearch = selectedTierSearch.trim().toLowerCase();
+  const SAVED_TIER_LISTS_PAGE_SIZE = 12;
+  const savedTierListCardThemes = [
+    "border-rose-200 bg-rose-50/70 hover:border-rose-300 hover:bg-rose-50",
+    "border-orange-200 bg-orange-50/70 hover:border-orange-300 hover:bg-orange-50",
+    "border-amber-200 bg-amber-50/70 hover:border-amber-300 hover:bg-amber-50",
+    "border-yellow-200 bg-yellow-50/70 hover:border-yellow-300 hover:bg-yellow-50",
+    "border-lime-200 bg-lime-50/70 hover:border-lime-300 hover:bg-lime-50",
+    "border-emerald-200 bg-emerald-50/70 hover:border-emerald-300 hover:bg-emerald-50",
+    "border-teal-200 bg-teal-50/70 hover:border-teal-300 hover:bg-teal-50",
+    "border-cyan-200 bg-cyan-50/70 hover:border-cyan-300 hover:bg-cyan-50",
+    "border-sky-200 bg-sky-50/70 hover:border-sky-300 hover:bg-sky-50",
+    "border-indigo-200 bg-indigo-50/70 hover:border-indigo-300 hover:bg-indigo-50",
+    "border-violet-200 bg-violet-50/70 hover:border-violet-300 hover:bg-violet-50",
+    "border-fuchsia-200 bg-fuchsia-50/70 hover:border-fuchsia-300 hover:bg-fuchsia-50",
+  ];
+  const getTierListLikes = (tierList: any) =>
+    Array.isArray(tierList.likes)
+      ? tierList.likes.filter((likedUid: unknown): likedUid is string => typeof likedUid === "string")
+      : [];
+  const getOperatorRarityNumber = (operator: any) => {
+    const rarity = Number.parseInt(String(operator.rarity ?? ""), 10);
+
+    return Number.isFinite(rarity) ? rarity : 0;
+  };
+  const getOperatorRarityCardClassName = (rarity: number) => {
+    switch (rarity) {
+      case 6:
+        return "border-orange-200 bg-orange-50";
+      case 5:
+        return "border-amber-200 bg-amber-50";
+      case 4:
+        return "border-violet-200 bg-violet-50";
+      case 3:
+        return "border-sky-200 bg-sky-50";
+      case 2:
+        return "border-emerald-200 bg-emerald-50";
+      default:
+        return "border-slate-200 bg-slate-50";
+    }
+  };
+  const sortedSavedTierLists = useMemo(
+    () =>
+      [...savedTierLists].sort((left, right) => {
+        const likeDifference = getTierListLikes(right).length - getTierListLikes(left).length;
+
+        if (likeDifference !== 0) {
+          return likeDifference;
+        }
+
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      }),
+    [savedTierLists],
+  );
+  const savedTierListTotalPages = Math.max(
+    1,
+    Math.ceil(sortedSavedTierLists.length / SAVED_TIER_LISTS_PAGE_SIZE),
+  );
+  const paginatedSavedTierLists = sortedSavedTierLists.slice(
+    (savedTierListPage - 1) * SAVED_TIER_LISTS_PAGE_SIZE,
+    savedTierListPage * SAVED_TIER_LISTS_PAGE_SIZE,
+  );
+  const selectedTierSearchResults = useMemo(
+    () =>
+      normalizedSelectedTierSearch
+        ? selectedTierBoard
+            .flatMap(({ tier, operators }) =>
+              operators.map((operator) => ({
+                operator,
+                tier,
+              })),
+            )
+            .filter(({ operator }) =>
+              operator.name.toLowerCase().includes(normalizedSelectedTierSearch),
+            )
+            .sort((left, right) => left.operator.name.localeCompare(right.operator.name))
+        : [],
+    [normalizedSelectedTierSearch, selectedTierBoard],
+  );
+  useEffect(() => {
+    setSavedTierListPage((current) => Math.min(current, savedTierListTotalPages));
+  }, [savedTierListTotalPages]);
+
   return (
     <TabsContent value="tierlist" className="mt-0 focus-visible:outline-none space-y-6">
       <Card className="glass-card overflow-hidden border-0 shadow-sm">
@@ -113,7 +215,7 @@ export function TierListTabContent({
                   : "rounded-xl border-slate-200 text-slate-600"
               }
             >
-              Xem tier list
+              Tierlist của mọi người
             </Button>
             <Button
               type="button"
@@ -131,29 +233,104 @@ export function TierListTabContent({
 
           {tierListView === "browse" ? (
             <div className="space-y-4">
-              {savedTierLists.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                  {savedTierLists.map((tierList) => (
-                    <button
-                      key={tierList.id}
-                      type="button"
-                      onClick={() => handleOpenSavedTierList(tierList)}
-                      className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                        selectedTierList?.id === tierList.id
-                          ? "border-rose-300 bg-white shadow-sm"
-                          : "border-slate-200 bg-white"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-800">{tierList.name}</p>
-                          <p className="mt-1 text-xs text-slate-400">
-                            {new Date(tierList.createdAt).toLocaleDateString("vi-VN")}
-                          </p>
-                        </div>
+              {isTierListLoading ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-700">Đang tải tier list...</p>
+                    <Badge variant="outline" className="border-slate-200 bg-white text-slate-500">
+                      MongoDB
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {Array.from({ length: SAVED_TIER_LISTS_PAGE_SIZE }).map((_, index) => (
+                      <div
+                        key={`tier-list-loading-${index}`}
+                        className={`min-h-28 animate-pulse rounded-2xl border p-4 ${
+                          savedTierListCardThemes[index % savedTierListCardThemes.length]
+                        }`}
+                      >
+                        <div className="h-4 w-3/4 rounded bg-slate-200" />
+                        <div className="mt-3 h-3 w-1/2 rounded bg-slate-100" />
+                        <div className="mt-2 h-3 w-2/3 rounded bg-slate-100" />
                       </div>
-                    </button>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+              ) : savedTierLists.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {paginatedSavedTierLists.map((tierList, tierListIndex) => (
+                      (() => {
+                        const likes = getTierListLikes(tierList);
+                        const isLiked = currentUid ? likes.includes(currentUid) : false;
+                        const cardTheme =
+                          savedTierListCardThemes[tierListIndex % savedTierListCardThemes.length];
+
+                        return (
+                          <button
+                            key={tierList.id}
+                            type="button"
+                            onClick={() => handleOpenSavedTierList(tierList)}
+                            className={`min-h-28 w-full rounded-2xl border p-4 text-left transition-all ${
+                              selectedTierList?.id === tierList.id
+                                ? `${cardTheme} shadow-sm ring-2 ring-rose-200`
+                                : cardTheme
+                            }`}
+                          >
+                            <div className="flex h-full items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-slate-800">{tierList.name}</p>
+                                <p className="mt-1 text-xs text-slate-400">
+                                  {new Date(tierList.createdAt).toLocaleDateString("vi-VN")}
+                                </p>
+                                <p className="mt-1 truncate text-xs text-slate-400">
+                                  {tierList.authorName || "Chưa có tên"}
+                                  {tierList.authorUid ? ` · UID ${tierList.authorUid}` : ""}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1 text-xs font-semibold text-rose-500">
+                                <Heart
+                                  className={`size-4 ${isLiked ? "fill-rose-500 text-rose-500" : ""}`}
+                                />
+                                {likes.length}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })()
+                    ))}
+                  </div>
+                  {savedTierListTotalPages > 1 ? (
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={savedTierListPage <= 1}
+                        onClick={() => setSavedTierListPage((page) => Math.max(1, page - 1))}
+                        className="rounded-lg border-slate-200 text-slate-600"
+                      >
+                        Trước
+                      </Button>
+                      <Badge variant="outline" className="border-slate-200 bg-white px-3 py-1.5 text-slate-600">
+                        Trang {savedTierListPage} / {savedTierListTotalPages}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={savedTierListPage >= savedTierListTotalPages}
+                        onClick={() =>
+                          setSavedTierListPage((page) =>
+                            Math.min(savedTierListTotalPages, page + 1),
+                          )
+                        }
+                        className="rounded-lg border-slate-200 text-slate-600"
+                      >
+                        Sau
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
@@ -163,10 +340,116 @@ export function TierListTabContent({
 
               <div className="space-y-3">
                 {selectedTierList ? (
+                  (() => {
+                    const selectedLikes = getTierListLikes(selectedTierList);
+                    const isSelectedLiked = currentUid
+                      ? selectedLikes.includes(currentUid)
+                      : false;
+
+                    return (
                   <>
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <p className="text-lg font-bold text-slate-800">{selectedTierList.name}</p>
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-lg font-bold text-slate-800">
+                            {selectedTierList.name}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Người tạo: {selectedTierList.authorName || "Chưa có tên"}
+                            {selectedTierList.authorUid ? ` · UID ${selectedTierList.authorUid}` : ""}
+                          </p>
+                        </div>
+                        {selectedTierListSource === "public" ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isSelectedLiked}
+                            onClick={() => handleToggleSavedTierListLike(selectedTierList.id)}
+                            className={`rounded-xl border-rose-200 ${
+                              isSelectedLiked
+                                ? "bg-rose-50 text-rose-600"
+                                : "bg-white text-slate-600"
+                            }`}
+                          >
+                            <Heart
+                              className={`size-4 ${
+                                isSelectedLiked ? "fill-rose-500 text-rose-500" : ""
+                              }`}
+                            />
+                            {selectedLikes.length}
+                          </Button>
+                        ) : null}
+                      </div>
+                      <p className="mb-3 text-xs text-slate-400">
+                        Tìm character để xem nhanh avatar, tên và sao trong list này.
+                      </p>
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                          <Search className="h-5 w-5 text-slate-400" />
+                        </div>
+                        <Input
+                          value={selectedTierSearch}
+                          onChange={(e) => setSelectedTierSearch(e.target.value)}
+                          placeholder="Tìm character trong tier list này"
+                          className="h-12 rounded-xl border-slate-200 bg-white pl-10 text-base text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:ring-rose-400/20"
+                        />
+                      </div>
+
+                      {normalizedSelectedTierSearch ? (
+                        <div className="mt-3">
+                          {selectedTierSearchResults.length > 0 ? (
+                            <div className="max-h-[330px] overflow-y-auto pr-1">
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                {selectedTierSearchResults.map(({ operator, tier }) => {
+                                  const rarity = getOperatorRarityNumber(operator);
+
+                                  return (
+                              <div
+                                key={`selected-tier-search-${operator.name}-${tier}`}
+                                className={`min-h-[102px] rounded-xl border p-3 ${getOperatorRarityCardClassName(
+                                  rarity,
+                                )}`}
+                              >
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <TierOperatorAvatar operator={operator} sizeClassName="size-12" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="min-w-0">
+                                      <p className="truncate font-semibold text-slate-800">
+                                        {operator.name}
+                                      </p>
+                                    </div>
+                                    <div className="mt-1">
+                                      <Badge className={getTierBadgeClassName(tier)}>{tier}</Badge>
+                                    </div>
+                                    {rarity > 0 ? (
+                                      <div className="mt-2 flex items-center gap-0.5">
+                                        {Array.from({ length: rarity }).map((_, starIndex) => (
+                                          <Star
+                                            key={`selected-tier-search-${operator.name}-${tier}-star-${starIndex}`}
+                                            className="h-3.5 w-3.5 fill-amber-500 text-amber-500"
+                                          />
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="mt-2 text-xs text-slate-500">Không rõ sao</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
+                              Không tìm thấy character trong tier list này.
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
+
                     {selectedTierBoard.map(({ tier, operators }) => (
                       <div
                         key={`selected-tier-board-${tier}`}
@@ -193,6 +476,8 @@ export function TierListTabContent({
                       </div>
                     ))}
                   </>
+                    );
+                  })()
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
                     Chọn một tier list ở trên để xem.
@@ -203,16 +488,30 @@ export function TierListTabContent({
           ) : (
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="mb-3">
-                  <p className="text-sm font-semibold text-slate-800">Tierlist da tao</p>
-                  <p className="text-xs text-slate-400">Chọn để sửa, xem hoặc xóa.</p>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Tier cho mọi người xem</p>
+                    <p className="text-xs text-slate-400">Bấm vào card để xem, hoặc sửa/xóa bằng nút bên phải.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetTierListEditor}
+                    className="rounded-lg border-slate-200 text-slate-600"
+                  >
+                    <Plus className="size-4" />
+                    Tạo tierlist mới
+                  </Button>
                 </div>
                 {savedTierLists.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                     {savedTierLists.map((tierList) => (
-                      <div
+                      <button
                         key={`create-tier-list-${tierList.id}`}
-                        className="rounded-2xl border border-slate-200 bg-white p-4"
+                        type="button"
+                        onClick={() => handleOpenSavedTierList(tierList, "public")}
+                        className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-rose-200 hover:bg-rose-50/40"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -226,48 +525,118 @@ export function TierListTabContent({
                               type="button"
                               size="sm"
                               variant="outline"
-                              onClick={() => handleOpenSavedTierList(tierList)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleLoadSavedTierListToEditor(tierList, "public");
+                              }}
                               className="rounded-lg border-slate-200 text-slate-600"
                             >
-                              Xem
+                              Sửa
                             </Button>
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
-                              onClick={() => handleLoadSavedTierListToEditor(tierList)}
-                              className="rounded-lg border-slate-200 text-slate-600"
-                            >
-                              Sua
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeleteSavedTierList(tierList.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteSavedTierList(tierList.id, "public");
+                              }}
                               className="rounded-lg border-red-200 text-red-600"
                             >
-                              Xoa
+                              Xóa
                             </Button>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-400">
-                    Chưa có tierlist nào đã lưu.
+                    Chưa có tier list public nào.
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-3">
+                  <p className="text-sm font-semibold text-slate-800">Tier list cá nhân tạo ở local</p>
+                  <p className="text-xs text-slate-400">Chỉ lưu trên trình duyệt/máy hiện tại của bạn.</p>
+                </div>
+                {localTierLists.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                    {localTierLists.map((tierList) => (
+                      <button
+                        key={`local-tier-list-${tierList.id}`}
+                        type="button"
+                        onClick={() => handleOpenSavedTierList(tierList, "local")}
+                        className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-sky-200 hover:bg-sky-50/40"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-slate-800">{tierList.name}</p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {new Date(tierList.createdAt).toLocaleDateString("vi-VN")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleLoadSavedTierListToEditor(tierList, "local");
+                              }}
+                              className="rounded-lg border-slate-200 text-slate-600"
+                            >
+                              Sửa
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteSavedTierList(tierList.id, "local");
+                              }}
+                              className="rounded-lg border-red-200 text-red-600"
+                            >
+                              Xóa
+                            </Button>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-400">
+                    Chưa có tier list local nào.
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col gap-3 xl:flex-row">
-                <Input
-                  placeholder="Đặt tên tier list"
-                  value={tierListName}
-                  onChange={(e) => setTierListName(e.target.value)}
-                  className="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:ring-rose-400/20 xl:max-w-[320px]"
-                />
+                <div className="space-y-1 xl:max-w-[320px]">
+                  <Input
+                    placeholder="Đặt tên tier list"
+                    value={tierListName}
+                    maxLength={tierListNameMaxLength}
+                    onChange={(e) => setTierListName(e.target.value)}
+                    className={`h-12 rounded-xl bg-white text-base text-slate-800 placeholder:text-slate-400 focus:ring-rose-400/20 ${
+                      tierListNameIssue
+                        ? "border-red-300 focus:border-red-400"
+                        : "border-slate-200 focus:border-rose-400"
+                    }`}
+                  />
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className={tierListNameIssue ? "text-red-500" : "text-slate-400"}>
+                      {tierListNameIssue || "Tên tối đa 15 ký tự."}
+                    </span>
+                    <span className="shrink-0 text-slate-400">
+                      {tierListName.length}/{tierListNameMaxLength}
+                    </span>
+                  </div>
+                </div>
                 <Input
                   placeholder="Tạo tier mới, ví dụ SS hoặc Meme"
                   value={newTierName}
@@ -298,7 +667,7 @@ export function TierListTabContent({
                 </div>
                 <Button
                   type="button"
-                  onClick={handleSaveTierList}
+                  onClick={() => handleSaveTierList("public")}
                   className="rounded-xl bg-rose-500 text-white hover:bg-rose-600"
                 >
                   Lưu tier list
@@ -306,7 +675,19 @@ export function TierListTabContent({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setTierAssignments({})}
+                  onClick={() => handleSaveTierList("local")}
+                  className="rounded-xl border-sky-200 text-sky-700 hover:bg-sky-50"
+                >
+                  Lưu local
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (window.confirm("Xóa toàn bộ xếp hạng hiện tại?")) {
+                      setTierAssignments({});
+                    }
+                  }}
                   className="rounded-xl border-slate-200 text-slate-600"
                 >
                   Xóa xếp hạng

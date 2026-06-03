@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -52,6 +52,10 @@ import {
   X,
 } from "lucide-react";
 import { MainTab, ToolTab } from "@/lib/site-navigation";
+import {
+  findTierListNameIssue,
+  TIER_LIST_NAME_MAX_LENGTH,
+} from "@/lib/tier-list-validation";
 import { BannersTabContent } from "@/components/game-user-page/tabs/banners-tab-content";
 import { CharactersTabContent } from "@/components/game-user-page/tabs/characters-tab-content";
 import { GachaTabContent } from "@/components/game-user-page/tabs/gacha-tab-content";
@@ -1004,8 +1008,13 @@ const hydrateSavedTierList = (value: unknown): SavedTierList | null => {
 
   return {
     assignments,
+    authorName: typeof candidate.authorName === "string" ? candidate.authorName : "",
+    authorUid: typeof candidate.authorUid === "string" ? candidate.authorUid : "",
     createdAt,
     id,
+    likes: Array.isArray(candidate.likes)
+      ? candidate.likes.filter((likedUid): likedUid is string => typeof likedUid === "string")
+      : [],
     name,
     tiers,
   };
@@ -1134,144 +1143,16 @@ type TierRank = string;
 type TierAssignmentMap = Record<string, TierRank | "">;
 type SavedTierList = {
   assignments: TierAssignmentMap;
+  authorName?: string;
+  authorUid?: string;
   createdAt: number;
   id: string;
+  likes?: string[];
   name: string;
   tiers: string[];
 };
 
-const DEFAULT_SAVED_TIER_LISTS: SavedTierList[] = [
-  {
-    assignments: {
-      "Exusiai the New Covenant": "OP+",
-      Haruka: "OP+",
-      "Wiš'adel": "OP+",
-      Exusiai: "S",
-      Ash: "A+",
-      Archetto: "A+",
-      "Pozëmka": "S-",
-      Schwarz: "A+",
-      Lemuen: "S+",
-      Fartooth: "A",
-      Fiammetta: "S-",
-      W: "A+",
-      "Ch'en the Dawnstreak": "",
-      "Ch'en the Holungday": "OP-",
-      Rosa: "S",
-      Typhon: "S+",
-      Rosmontis: "A",
-      Ray: "A+",
-      Narantuya: "S",
-      Logos: "OP",
-      Eyjafjalla: "S",
-      Ceobe: "S",
-      "Ho'olheyak": "A",
-      Dusk: "A+",
-      Mostima: "S-",
-      Marcille: "A+",
-      Passenger: "S-",
-      "Astgenne the Lightchaser": "A-",
-      Ebenholz: "S-",
-      Ifrit: "S",
-      Lin: "S",
-      Carnelian: "A",
-      Goldenglow: "S+",
-      "Lappland the Decadenza": "S-",
-      "Hoshiguma the Breacher": "OP",
-      "Blaze the Igniting Spark": "S",
-      Nymph: "S+",
-      Necrass: "S+",
-      SilverAsh: "S",
-      Thorns: "S",
-      Qiubai: "S",
-      Pallas: "A",
-      "Ch'en": "A+",
-      Irene: "S-",
-      Degenbrecher: "OP",
-      Blaze: "S-",
-      "Gavial the Invincible": "S",
-      Lessing: "A",
-      Skadi: "A+",
-      "Nearl the Radiant Knight": "S",
-      Mountain: "S",
-      Chongyue: "S",
-      "Zuo Le": "S+",
-      Hellagur: "A",
-      Surtr: "S+",
-      "Vina Victoria": "S-",
-      Viviana: "S",
-      "Executor the Ex Foedere": "S+",
-      Entelechia: "S+",
-      "Młynar": "OP",
-      "Leizi the Thunderbringer": "OP",
-      Ulpianus: "S+",
-      Hoederer: "S-",
-      Pepe: "S-",
-      Hoshiguma: "S-",
-      Nian: "S-",
-      "Sankta Miksaparato": "A+",
-      "Jessica the Liberated": "S-",
-      Mudrock: "S",
-      Penance: "S",
-      Eunectes: "A+",
-      Saria: "S",
-      Shu: "OP-",
-      Blemishine: "A+",
-      Horn: "S",
-      Yu: "S-",
-      Siege: "A",
-      Vulpisfoglia: "S-",
-      Saga: "S-",
-      Flametail: "S-",
-      Saileach: "S",
-      Bagpipe: "S+",
-      Muelsyse: "S",
-      Vigil: "A-",
-      Ines: "OP",
-      Shining: "A+",
-      Nightingale: "S",
-      Lumen: "S-",
-      "Reed the Flame Shadow": "S+",
-      Mon3tr: "OP-",
-      Suzuran: "S+",
-      "Skadi the Corrupting Heart": "S",
-      "Civilight Eterna": "S",
-      Gnosis: "S",
-      "Silence the Paradigmatic": "A+",
-      Magallan: "A+",
-      Ling: "A+",
-      "Kal'tsit": "S",
-      Tragodia: "OP",
-      Virtuosa: "S+",
-      Phantom: "A+",
-      "Texas the Omertosa": "OP-",
-      "Kirin R Yato": "OP-",
-      Crownslayer: "A",
-      "Swire the Elegant Wit": "A+",
-      Lee: "A+",
-      Ela: "OP-",
-      Dorothy: "S-",
-      Ascalon: "S+",
-      Mizuki: "A+",
-      Gladiia: "S-",
-      Weedy: "S",
-      "Specter the Unchained": "S",
-      "Thorns the Lodestar": "A+",
-      Aak: "A+",
-      Angelina: "A+",
-      "Eyjafjalla the Hvít Aska": "OP-",
-      "Pramanix the Prerita": "OP",
-      "SilverAsh the Reignfrost": "OP",
-      Nasti: "S",
-      Mantra: "S",
-      "Togawa Sakiko": "OP",
-    },
-    createdAt: 1779985894777,
-    id: "1779985894777",
-    name: "2026 only 6s",
-    tiers: ["OP+", "OP", "OP-", "S+", "S", "S-", "A+", "A", "A-"],
-  },
-];
+const DEFAULT_SAVED_TIER_LISTS: SavedTierList[] = [];
 
 const mergeDefaultTierLists = (tierLists: SavedTierList[]) => {
   const existingNames = new Set(
@@ -1289,7 +1170,7 @@ const MONTH_MS = 30.4375 * DAY_MS;
 const PULL_PLANNER_STORAGE_KEY = "arkreview_pull_planner_v1";
 const CUSTOM_PULL_PLANNER_TARGET_KEY = "custom-target-date";
 const TIER_DRAFT_KEY = "arkreview_tierlist_draft_v1";
-const TIER_LISTS_KEY = "arkreview_tierlists_v1";
+const LOCAL_TIER_LISTS_KEY = "arkreview_local_tierlists_v1";
 const LIMITED_LUCKY_BOARD_EXPECTED_ORUNDUM = 8170;
 const MIN_WEEKLY_ANNIHILATION_ORUNDUM = 1200;
 const MAX_WEEKLY_ANNIHILATION_ORUNDUM = 1800;
@@ -1901,6 +1782,47 @@ const getTierBadgeClassName = (tier: TierRank) => {
   }
 };
 
+const getTierButtonClassName = (tier: TierRank, active = false) => {
+  if (active) {
+    return getTierBadgeClassName(tier);
+  }
+
+  switch (tier) {
+    case "OP+":
+      return "border-rose-200 text-rose-600 hover:border-rose-400 hover:bg-rose-500 hover:text-white";
+    case "OP":
+      return "border-rose-200 text-rose-600 hover:border-rose-300 hover:bg-rose-400 hover:text-white";
+    case "OP-":
+      return "border-orange-200 text-orange-600 hover:border-orange-300 hover:bg-orange-400 hover:text-white";
+    case "S":
+      return "border-amber-200 text-amber-600 hover:border-amber-300 hover:bg-amber-400 hover:text-white";
+    case "A":
+      return "border-emerald-200 text-emerald-600 hover:border-emerald-300 hover:bg-emerald-400 hover:text-white";
+    case "B":
+      return "border-sky-200 text-sky-600 hover:border-sky-300 hover:bg-sky-400 hover:text-white";
+    case "C":
+      return "border-indigo-200 text-indigo-600 hover:border-indigo-300 hover:bg-indigo-400 hover:text-white";
+    case "D":
+      return "border-violet-200 text-violet-600 hover:border-violet-300 hover:bg-violet-400 hover:text-white";
+    case "E":
+      return "border-slate-200 text-slate-600 hover:border-slate-400 hover:bg-slate-500 hover:text-white";
+    default: {
+      const fallbackClasses = [
+        "border-pink-200 text-pink-600 hover:border-pink-400 hover:bg-pink-500 hover:text-white",
+        "border-cyan-200 text-cyan-600 hover:border-cyan-400 hover:bg-cyan-500 hover:text-white",
+        "border-lime-200 text-lime-600 hover:border-lime-400 hover:bg-lime-500 hover:text-white",
+        "border-fuchsia-200 text-fuchsia-600 hover:border-fuchsia-400 hover:bg-fuchsia-500 hover:text-white",
+        "border-stone-200 text-stone-600 hover:border-stone-400 hover:bg-stone-500 hover:text-white",
+      ];
+      const colorIndex =
+        [...tier].reduce((sum, character) => sum + character.charCodeAt(0), 0) %
+        fallbackClasses.length;
+
+      return fallbackClasses[colorIndex];
+    }
+  }
+};
+
 const OperatorAvatarPreview = ({
   operator,
   className = "size-14",
@@ -2027,11 +1949,7 @@ const TierAssignmentAvatar = ({
               variant="outline"
               size="sm"
               onClick={() => onAssign(tier)}
-              className={`rounded-xl ${
-                currentTier === tier
-                  ? getTierBadgeClassName(tier)
-                  : "border-slate-200 text-slate-700"
-              }`}
+              className={`rounded-xl ${getTierButtonClassName(tier, currentTier === tier)}`}
             >
               {tier}
             </Button>
@@ -2158,8 +2076,18 @@ export function GameUserPage({
   const [savedTierLists, setSavedTierLists] = useState<SavedTierList[]>(
     DEFAULT_SAVED_TIER_LISTS,
   );
+  const [localTierLists, setLocalTierLists] = useState<SavedTierList[]>([]);
+  const [hasHydratedLocalTierLists, setHasHydratedLocalTierLists] = useState(false);
+  const [isTierListLoading, setIsTierListLoading] = useState(false);
   const [selectedTierListId, setSelectedTierListId] = useState(
     DEFAULT_SAVED_TIER_LISTS[0]?.id ?? "",
+  );
+  const [selectedTierListSource, setSelectedTierListSource] = useState<"public" | "local">(
+    "public",
+  );
+  const [editingTierListId, setEditingTierListId] = useState("");
+  const [editingTierListSource, setEditingTierListSource] = useState<"public" | "local">(
+    "public",
   );
   const [tierSearch, setTierSearch] = useState("");
   const [tierStarFilter, setTierStarFilter] = useState("all");
@@ -2175,6 +2103,9 @@ export function GameUserPage({
   const [bannerError, setBannerError] = useState("");
   const [bannerSearch, setBannerSearch] = useState("");
   const [bannerPage, setBannerPage] = useState(1);
+  const tierListNameIssue = tierListName.trim()
+    ? findTierListNameIssue(tierListName)
+    : "";
   const plannerOrundum = Math.max(0, parseNumberInput(pullPlanner.orundum));
   const plannerPrime = Math.max(0, parseNumberInput(pullPlanner.originitePrime));
   const plannerPermits = Math.max(0, parseNumberInput(pullPlanner.permits));
@@ -2959,9 +2890,11 @@ export function GameUserPage({
   const unassignedOperatorCount = combinedOperatorData.filter(
     (operator) => !tierAssignments[operator.name],
   ).length;
+  const selectedTierListPool =
+    selectedTierListSource === "local" ? localTierLists : savedTierLists;
   const selectedTierList =
-    savedTierLists.find((tierList) => tierList.id === selectedTierListId) ??
-    savedTierLists[0] ??
+    selectedTierListPool.find((tierList) => tierList.id === selectedTierListId) ??
+    selectedTierListPool[0] ??
     null;
   const selectedTierBoard = selectedTierList
     ? selectedTierList.tiers.map((tier) => ({
@@ -3242,27 +3175,23 @@ export function GameUserPage({
         console.error(error);
       }
     }
-    const savedTierListsRaw = localStorage.getItem(TIER_LISTS_KEY);
-    if (savedTierListsRaw) {
+    const savedLocalTierLists = localStorage.getItem(LOCAL_TIER_LISTS_KEY);
+    if (savedLocalTierLists) {
       try {
-        const parsed = JSON.parse(savedTierListsRaw) as unknown[];
-        const hydratedTierLists = Array.isArray(parsed)
+        const parsed = JSON.parse(savedLocalTierLists);
+        const hydratedLocalTierLists = Array.isArray(parsed)
           ? parsed
-              .map((tierList) => hydrateSavedTierList(tierList))
-              .filter((tierList): tierList is SavedTierList => tierList !== null)
+              .map((tierList: unknown) => hydrateSavedTierList(tierList))
+              .filter((tierList: SavedTierList | null): tierList is SavedTierList => tierList !== null)
           : [];
-        const mergedTierLists = mergeDefaultTierLists(hydratedTierLists);
-        setSavedTierLists(mergedTierLists);
-        if (mergedTierLists[0]) {
-          setSelectedTierListId(mergedTierLists[0].id);
-        }
+
+        setLocalTierLists(hydratedLocalTierLists);
       } catch (error) {
         console.error(error);
       }
-    } else if (DEFAULT_SAVED_TIER_LISTS[0]) {
-      setSavedTierLists(DEFAULT_SAVED_TIER_LISTS);
-      setSelectedTierListId(DEFAULT_SAVED_TIER_LISTS[0].id);
     }
+    setHasHydratedLocalTierLists(true);
+    void loadSavedTierListsFromMongo();
     const savedPullPlannerRaw = localStorage.getItem(PULL_PLANNER_STORAGE_KEY);
     if (savedPullPlannerRaw) {
       try {
@@ -3294,8 +3223,10 @@ export function GameUserPage({
   }, [tierAssignments, tierListName, tierOrder]);
 
   useEffect(() => {
-    localStorage.setItem(TIER_LISTS_KEY, JSON.stringify(savedTierLists));
-  }, [savedTierLists]);
+    if (!hasHydratedLocalTierLists) return;
+
+    localStorage.setItem(LOCAL_TIER_LISTS_KEY, JSON.stringify(localTierLists));
+  }, [hasHydratedLocalTierLists, localTierLists]);
 
   useEffect(() => {
     if (!hasHydratedPullPlanner) return;
@@ -3371,6 +3302,10 @@ export function GameUserPage({
       return;
     }
 
+    if (!window.confirm(`Xóa tier ${tierToDelete}? Operator trong tier này sẽ bị bỏ xếp hạng.`)) {
+      return;
+    }
+
     setTierOrder((current) => current.filter((tier) => tier !== tierToDelete));
     setTierAssignments((current) =>
       Object.fromEntries(
@@ -3405,7 +3340,7 @@ export function GameUserPage({
     setErrorMessage("");
   };
 
-  const handleSaveTierList = () => {
+  const handleSaveTierList = async () => {
     const trimmedName = tierListName.trim();
     if (!trimmedName) {
       setErrorMessage("Vui lòng nhập tên tier list trước khi lưu.");
@@ -3414,20 +3349,76 @@ export function GameUserPage({
 
     const nextTierList: SavedTierList = {
       assignments: tierAssignments,
+      authorName: userInfo?.name ?? "",
+      authorUid: userInfo?.uid ?? uid.trim(),
       createdAt: Date.now(),
       id: `${Date.now()}`,
+      likes: [],
       name: trimmedName,
       tiers: [...tierOrder],
     };
 
-    setSavedTierLists((current) => [nextTierList, ...current]);
-    setSelectedTierListId(nextTierList.id);
-    setTierListView("browse");
-    setErrorMessage("");
+    try {
+      const res = await fetch("/api/tierlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextTierList),
+      });
+      const result = await res.json();
+
+      if (!res.ok) {
+        setErrorMessage(result.message || "Không thể lưu tier list.");
+        return;
+      }
+
+      const savedTierList = hydrateSavedTierList(result.tierList) ?? nextTierList;
+      setSavedTierLists((current) => [
+        savedTierList,
+        ...current.filter((tierList) => tierList.id !== savedTierList.id),
+      ]);
+      setSelectedTierListId(savedTierList.id);
+      setTierListView("browse");
+      setErrorMessage("");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Không thể lưu tier list.");
+    }
   };
 
   const handleOpenSavedTierList = (tierList: SavedTierList) => {
     setSelectedTierListId(tierList.id);
+  };
+
+  const handleToggleSavedTierListLike = async (tierListId: string) => {
+    const likedUid = userInfo?.uid ?? uid.trim();
+    if (!likedUid) {
+      setErrorMessage("Vui lòng nhập UID trước khi thích tier list.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/tierlist", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: tierListId, uid: likedUid }),
+      });
+      const result = await res.json();
+
+      if (!res.ok || !Array.isArray(result.likes)) {
+        setErrorMessage(result.message || "Không thể cập nhật lượt thích.");
+        return;
+      }
+
+      setSavedTierLists((current) =>
+        current.map((tierList) =>
+          tierList.id === tierListId ? { ...tierList, likes: result.likes } : tierList,
+        ),
+      );
+      setErrorMessage("");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Không thể cập nhật lượt thích.");
+    }
   };
 
   const handleLoadSavedTierListToEditor = (tierList: SavedTierList) => {
@@ -3437,9 +3428,168 @@ export function GameUserPage({
     setTierListView("create");
   };
 
-  const handleDeleteSavedTierList = (id: string) => {
-    setSavedTierLists((current) => current.filter((tierList) => tierList.id !== id));
-    setSelectedTierListId((current) => (current === id ? "" : current));
+  const handleDeleteSavedTierList = async (id: string) => {
+    try {
+      const res = await fetch("/api/tierlist", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const result = await res.json();
+
+      if (!res.ok) {
+        setErrorMessage(result.message || "Không thể xóa tier list.");
+        return;
+      }
+
+      setSavedTierLists((current) => current.filter((tierList) => tierList.id !== id));
+      setSelectedTierListId((current) => (current === id ? "" : current));
+      setErrorMessage("");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Không thể xóa tier list.");
+    }
+  };
+
+  const handleResetTierListEditor = () => {
+    if (
+      (tierListName.trim() || Object.values(tierAssignments).some(Boolean)) &&
+      !window.confirm("Tạo tier list mới sẽ xóa bản nháp hiện tại. Bạn muốn tiếp tục?")
+    ) {
+      return;
+    }
+
+    setTierAssignments({});
+    setTierListName("");
+    setNewTierName("");
+    setTierOrder([...DEFAULT_TIER_ORDER]);
+    setEditingTierListId("");
+    setEditingTierListSource("public");
+    setTierListView("create");
+    setErrorMessage("");
+  };
+
+  const handleOpenTierListForView = (
+    tierList: SavedTierList,
+    source: "public" | "local" = "public",
+  ) => {
+    setSelectedTierListId(tierList.id);
+    setSelectedTierListSource(source);
+    setTierListView("browse");
+  };
+
+  const handleEditTierListWithConfirm = (
+    tierList: SavedTierList,
+    source: "public" | "local" = "public",
+  ) => {
+    if (!window.confirm("Mở tier list này để sửa? Bản nháp hiện tại có thể bị thay thế.")) {
+      return;
+    }
+
+    setTierAssignments(tierList.assignments);
+    setTierListName(tierList.name.slice(0, TIER_LIST_NAME_MAX_LENGTH));
+    setTierOrder([...tierList.tiers]);
+    setEditingTierListId(tierList.id);
+    setEditingTierListSource(source);
+    setTierListView("create");
+  };
+
+  const handleDeleteTierListWithConfirm = async (
+    id: string,
+    source: "public" | "local" = "public",
+  ) => {
+    if (!window.confirm("Bạn chắc chắn muốn xóa tier list này?")) {
+      return;
+    }
+
+    if (source === "local") {
+      setLocalTierLists((current) => current.filter((tierList) => tierList.id !== id));
+      setSelectedTierListId((current) =>
+        current === id && selectedTierListSource === "local" ? "" : current,
+      );
+      setErrorMessage("");
+      return;
+    }
+
+    await handleDeleteSavedTierList(id);
+  };
+
+  const handleSaveTierListWithConfirm = async (target: "public" | "local" = "public") => {
+    const trimmedName = tierListName.trim();
+    const nameIssue = findTierListNameIssue(trimmedName);
+    if (nameIssue) {
+      setErrorMessage(nameIssue);
+      return;
+    }
+
+    if (
+      !window.confirm(
+        target === "public"
+          ? "Lưu tier list này công khai cho mọi người xem?"
+          : "Lưu tier list này vào local trên máy của bạn?",
+      )
+    ) {
+      return;
+    }
+
+    const shouldUpdateExisting = Boolean(editingTierListId && editingTierListSource === target);
+    const existingTierList =
+      target === "local"
+        ? localTierLists.find((tierList) => tierList.id === editingTierListId)
+        : savedTierLists.find((tierList) => tierList.id === editingTierListId);
+    const nextTierList: SavedTierList = {
+      assignments: tierAssignments,
+      authorName: userInfo?.name ?? "",
+      authorUid: userInfo?.uid ?? uid.trim(),
+      createdAt: shouldUpdateExisting ? existingTierList?.createdAt ?? Date.now() : Date.now(),
+      id: shouldUpdateExisting ? editingTierListId : `${target}-${Date.now()}`,
+      likes: target === "public" ? existingTierList?.likes ?? [] : [],
+      name: trimmedName,
+      tiers: [...tierOrder],
+    };
+
+    if (target === "local") {
+      setLocalTierLists((current) => [
+        nextTierList,
+        ...current.filter((tierList) => tierList.id !== nextTierList.id),
+      ]);
+      setSelectedTierListId(nextTierList.id);
+      setSelectedTierListSource("local");
+      setEditingTierListId(nextTierList.id);
+      setEditingTierListSource("local");
+      setTierListView("browse");
+      setErrorMessage("");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/tierlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextTierList),
+      });
+      const result = await res.json();
+
+      if (!res.ok) {
+        setErrorMessage(result.message || "Không thể lưu tier list.");
+        return;
+      }
+
+      const savedTierList = hydrateSavedTierList(result.tierList) ?? nextTierList;
+      setSavedTierLists((current) => [
+        savedTierList,
+        ...current.filter((tierList) => tierList.id !== savedTierList.id),
+      ]);
+      setSelectedTierListId(savedTierList.id);
+      setSelectedTierListSource("public");
+      setEditingTierListId(savedTierList.id);
+      setEditingTierListSource("public");
+      setTierListView("browse");
+      setErrorMessage("");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Không thể lưu tier list.");
+    }
   };
 
   const fetchGachaPageData = async (page: number, size: number) => {
@@ -3479,6 +3629,32 @@ export function GameUserPage({
       },
     };
   };
+
+  async function loadSavedTierListsFromMongo() {
+    setIsTierListLoading(true);
+    try {
+      const res = await fetch("/api/tierlist");
+      const result = await res.json();
+      const hydratedTierLists = Array.isArray(result.tierLists)
+        ? result.tierLists
+            .map((tierList: unknown) => hydrateSavedTierList(tierList))
+            .filter((tierList: SavedTierList | null): tierList is SavedTierList => tierList !== null)
+        : [];
+
+      setSavedTierLists(hydratedTierLists);
+      setSelectedTierListId((current) =>
+        current && hydratedTierLists.some((tierList) => tierList.id === current)
+          ? current
+          : hydratedTierLists[0]?.id ?? "",
+      );
+    } catch (error) {
+      console.error("Failed to load tier lists from MongoDB", error);
+      setSavedTierLists([]);
+      setSelectedTierListId("");
+    } finally {
+      setIsTierListLoading(false);
+    }
+  }
 
   const handleSearchGacha = async (page: number = 1, size?: number) => {
     setGachaAttempted(true);
@@ -3757,22 +3933,30 @@ export function GameUserPage({
 
               <TierListTabContent
                 getTierBadgeClassName={getTierBadgeClassName}
+                currentUid={userInfo?.uid ?? uid.trim()}
                 handleAddTier={handleAddTier}
                 handleAssignOperatorToTier={handleAssignOperatorToTier}
-                handleDeleteSavedTierList={handleDeleteSavedTierList}
+                handleDeleteSavedTierList={handleDeleteTierListWithConfirm}
                 handleDeleteTier={handleDeleteTier}
-                handleLoadSavedTierListToEditor={handleLoadSavedTierListToEditor}
+                handleLoadSavedTierListToEditor={handleEditTierListWithConfirm}
                 handleMoveTier={handleMoveTier}
-                handleOpenSavedTierList={handleOpenSavedTierList}
-                handleSaveTierList={handleSaveTierList}
+                handleOpenSavedTierList={handleOpenTierListForView}
+                handleResetTierListEditor={handleResetTierListEditor}
+                handleSaveTierList={handleSaveTierListWithConfirm}
+                handleToggleSavedTierListLike={handleToggleSavedTierListLike}
+                isTierListLoading={isTierListLoading}
+                localTierLists={localTierLists}
                 newTierName={newTierName}
                 paginatedTierPoolCandidates={paginatedTierPoolCandidates}
                 savedTierLists={savedTierLists}
                 selectedTierBoard={selectedTierBoard}
                 selectedTierList={selectedTierList}
+                selectedTierListSource={selectedTierListSource}
                 setNewTierName={setNewTierName}
                 setTierAssignments={setTierAssignments}
-                setTierListName={setTierListName}
+                setTierListName={(value) =>
+                  setTierListName(value.slice(0, TIER_LIST_NAME_MAX_LENGTH))
+                }
                 setTierListView={setTierListView}
                 setTierPoolPage={setTierPoolPage}
                 setTierSearch={setTierSearch}
@@ -3780,6 +3964,8 @@ export function GameUserPage({
                 tierAssignments={tierAssignments}
                 tierBoard={tierBoard}
                 tierListName={tierListName}
+                tierListNameIssue={tierListNameIssue}
+                tierListNameMaxLength={TIER_LIST_NAME_MAX_LENGTH}
                 tierListView={tierListView}
                 tierOrder={tierOrder}
                 tierPoolPage={tierPoolPage}
