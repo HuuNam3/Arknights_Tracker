@@ -1068,11 +1068,11 @@ type PullPlannerEventBonus = {
 type CommendationShopMode = "phase1" | "phase2" | "phase3";
 
 type PullPlannerState = {
-  annihilationUndoneMaps: string;
   commendations: string;
   commendationShopCurrentMonthClaimed: boolean;
   commendationShopMode: CommendationShopMode;
   currentBannerKey: string;
+  customTargetDate: string;
   dailyMissionEnabled: boolean;
   distinctions: string;
   distinctionShopCurrentMonthClaimed: boolean;
@@ -1085,6 +1085,7 @@ type PullPlannerState = {
   originitePrime: string;
   orundum: string;
   permits: string;
+  targetPulls: string;
   weeklyMissionEnabled: boolean;
   weeklyRegularOrundum: string;
 };
@@ -1286,10 +1287,10 @@ const mergeDefaultTierLists = (tierLists: SavedTierList[]) => {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MONTH_MS = 30.4375 * DAY_MS;
 const PULL_PLANNER_STORAGE_KEY = "arkreview_pull_planner_v1";
+const CUSTOM_PULL_PLANNER_TARGET_KEY = "custom-target-date";
 const TIER_DRAFT_KEY = "arkreview_tierlist_draft_v1";
 const TIER_LISTS_KEY = "arkreview_tierlists_v1";
 const LIMITED_LUCKY_BOARD_EXPECTED_ORUNDUM = 8170;
-const ANNIHILATION_FIRST_CLEAR_ORUNDUM_PER_MAP = 1500;
 const MIN_WEEKLY_ANNIHILATION_ORUNDUM = 1200;
 const MAX_WEEKLY_ANNIHILATION_ORUNDUM = 1800;
 const WEEKLY_ANNIHILATION_ORUNDUM_STEP = 50;
@@ -1315,11 +1316,11 @@ const DISTINCTION_SHOP_BATCHES = [
 ] as const;
 
 const DEFAULT_PULL_PLANNER: PullPlannerState = {
-  annihilationUndoneMaps: "0",
   commendations: "0",
   commendationShopCurrentMonthClaimed: false,
   commendationShopMode: "phase1",
   currentBannerKey: "",
+  customTargetDate: "",
   dailyMissionEnabled: false,
   distinctions: "0",
   distinctionShopCurrentMonthClaimed: false,
@@ -1332,6 +1333,7 @@ const DEFAULT_PULL_PLANNER: PullPlannerState = {
   originitePrime: "0",
   orundum: "0",
   permits: "0",
+  targetPulls: "300",
   weeklyMissionEnabled: false,
   weeklyRegularOrundum: "1800",
 };
@@ -1374,10 +1376,6 @@ const hydratePullPlannerState = (value: unknown): PullPlannerState | null => {
   const candidate = value as Partial<Record<keyof PullPlannerState, unknown>>;
 
   return {
-    annihilationUndoneMaps:
-      typeof candidate.annihilationUndoneMaps === "string"
-        ? candidate.annihilationUndoneMaps
-        : DEFAULT_PULL_PLANNER.annihilationUndoneMaps,
     commendations:
       typeof candidate.commendations === "string"
         ? candidate.commendations
@@ -1396,6 +1394,10 @@ const hydratePullPlannerState = (value: unknown): PullPlannerState | null => {
       typeof candidate.currentBannerKey === "string"
         ? candidate.currentBannerKey
         : DEFAULT_PULL_PLANNER.currentBannerKey,
+    customTargetDate:
+      typeof candidate.customTargetDate === "string"
+        ? candidate.customTargetDate
+        : DEFAULT_PULL_PLANNER.customTargetDate,
     dailyMissionEnabled:
       typeof candidate.dailyMissionEnabled === "boolean"
         ? candidate.dailyMissionEnabled
@@ -1444,6 +1446,10 @@ const hydratePullPlannerState = (value: unknown): PullPlannerState | null => {
       typeof candidate.permits === "string"
         ? candidate.permits
         : DEFAULT_PULL_PLANNER.permits,
+    targetPulls:
+      typeof candidate.targetPulls === "string"
+        ? candidate.targetPulls
+        : DEFAULT_PULL_PLANNER.targetPulls,
     weeklyMissionEnabled:
       typeof candidate.weeklyMissionEnabled === "boolean"
         ? candidate.weeklyMissionEnabled
@@ -2188,10 +2194,6 @@ export function GameUserPage({
     0,
     Math.floor(parseNumberInput(pullPlanner.distinctions)),
   );
-  const plannerAnnihilationUndoneMaps = Math.max(
-    0,
-    Math.floor(parseNumberInput(pullPlanner.annihilationUndoneMaps)),
-  );
   const plannerCommendationShopMode = pullPlanner.commendationShopMode;
   const plannerShards = Math.max(0, Math.floor(parseNumberInput(pullPlanner.originiumShards)));
   const plannerShardOrundum = Math.floor(plannerShards / 2) * 20;
@@ -2600,15 +2602,30 @@ export function GameUserPage({
     })
     .filter((target): target is NonNullable<typeof target> => target !== null)
     .sort((left, right) => left.date.localeCompare(right.date));
+  const customPullPlannerTargetTs = parseIsoDate(pullPlanner.customTargetDate);
+  const customPullPlannerTarget =
+    customPullPlannerTargetTs !== null && customPullPlannerTargetTs >= plannerTodayTs
+      ? {
+          date: pullPlanner.customTargetDate,
+          dateLabel: formatDisplayDate(pullPlanner.customTargetDate) ?? pullPlanner.customTargetDate,
+          details: null,
+          id: CUSTOM_PULL_PLANNER_TARGET_KEY,
+          isPredicted: false,
+          name: "Ngày tự chọn",
+        }
+      : null;
   const selectedPullPlannerTarget =
-    pullPlannerTargets.find((target) => target.id === pullPlanner.currentBannerKey) ??
-    pullPlannerTargets[0] ??
-    null;
-  const plannerDaysUntilBanner = selectedPullPlannerTarget
+    pullPlanner.currentBannerKey === CUSTOM_PULL_PLANNER_TARGET_KEY
+      ? customPullPlannerTarget
+      : pullPlannerTargets.find((target) => target.id === pullPlanner.currentBannerKey) ??
+        pullPlannerTargets[0] ??
+        customPullPlannerTarget;
+  const effectivePullPlannerTarget = selectedPullPlannerTarget;
+  const plannerDaysUntilBanner = effectivePullPlannerTarget
     ? Math.max(
         0,
         Math.ceil(
-          ((parseIsoDate(selectedPullPlannerTarget.date) ?? plannerTodayTs) -
+          ((parseIsoDate(effectivePullPlannerTarget.date) ?? plannerTodayTs) -
             plannerTodayTs) /
             DAY_MS,
         ),
@@ -2616,8 +2633,8 @@ export function GameUserPage({
     : 0;
   const plannerWeeksUntilBanner = Math.floor(plannerDaysUntilBanner / 7);
   const plannerTargetTs =
-    selectedPullPlannerTarget
-      ? parseIsoDate(selectedPullPlannerTarget.date) ?? plannerTodayTs
+    effectivePullPlannerTarget
+      ? parseIsoDate(effectivePullPlannerTarget.date) ?? plannerTodayTs
       : plannerTodayTs;
   const plannerReachableShopMonths = countReachableShopMonths(
     plannerTodayTs,
@@ -2659,8 +2676,6 @@ export function GameUserPage({
     : 0;
   const plannerFutureRegularOrundum =
     plannerWeeksUntilBanner * plannerWeeklyRegularOrundum;
-  const plannerFutureAnnihilationFirstClearOrundum =
-    plannerAnnihilationUndoneMaps * ANNIHILATION_FIRST_CLEAR_ORUNDUM_PER_MAP;
   const plannerTimelineEventBonuses = pullPlanner.eventRewardsEnabled
     ? pullPlannerTargets
         .filter(
@@ -2682,6 +2697,7 @@ export function GameUserPage({
             ? {
                 bannerId: target.id,
                 bannerName: target.name,
+                date: target.date,
                 bonus,
               }
             : null;
@@ -2692,6 +2708,7 @@ export function GameUserPage({
           ): entry is {
             bannerId: string;
             bannerName: string;
+            date: string;
             bonus: NonNullable<ReturnType<typeof getPullPlannerEventBonus>>;
           } => entry !== null,
         )
@@ -2716,6 +2733,7 @@ export function GameUserPage({
               ? {
                   bannerName: target.name,
                   bannerType,
+                  date: target.date,
                   pulls,
                 }
               : null;
@@ -2726,6 +2744,7 @@ export function GameUserPage({
             ): entry is {
               bannerName: string;
               bannerType: string;
+              date: string;
               pulls: number;
             } => entry !== null,
           )
@@ -2753,7 +2772,6 @@ export function GameUserPage({
     plannerFutureWeeklyMissionOrundum +
     plannerFutureMonthlyCardOrundum +
     plannerFutureRegularOrundum +
-    plannerFutureAnnihilationFirstClearOrundum +
     plannerFutureCommendationShopOrundum;
   const plannerProjectedStartOrundum =
     plannerCurrentOrundum + plannerFutureStableOrundum;
@@ -3287,6 +3305,7 @@ export function GameUserPage({
 
   useEffect(() => {
     if (!hasHydratedPullPlanner) return;
+    if (pullPlanner.currentBannerKey === CUSTOM_PULL_PLANNER_TARGET_KEY) return;
 
     const hasCurrentTarget = pullPlannerTargets.some(
       (target) => target.id === pullPlanner.currentBannerKey,
@@ -3659,6 +3678,8 @@ export function GameUserPage({
                     plannerCurrentLeftoverOrundum,
                     plannerDistinctionShopBreakdown:
                       plannerDistinctionShopPurchases.breakdown,
+                    plannerEventRewardEntries: plannerTimelineEventBonuses,
+                    plannerEventShopEntries: plannerTimelineEventShopEntries,
                     plannerIntelligenceCertificates,
                     plannerIntelligenceOrundum,
                     plannerCurrentOrundum,
@@ -3676,7 +3697,7 @@ export function GameUserPage({
                     plannerTargetOnlyPulls,
                     pullPlanner,
                     pullPlannerTargets,
-                    selectedPullPlannerTarget,
+                    selectedPullPlannerTarget: effectivePullPlannerTarget,
                   }}
                   recruitmentProps={{
                     RECRUITMENT_SPECIAL_TAGS,

@@ -12,7 +12,9 @@ const MAX_WEEKLY_ANNIHILATION_ORUNDUM = 1800;
 const WEEKLY_ANNIHILATION_ORUNDUM_STEP = 50;
 const COMMENDATION_ORUNDUM_BUNDLE_SIZE = 100;
 const COMMENDATION_PHASE_THREE_ORUNDUM_BUNDLE_SIZE = 30;
+const DAILY_SIGNIN_PERMIT_DAY = 17;
 const DISTINCTION_SHOP_BATCH_PERMITS = [1, 2, 5, 10, 20] as const;
+const CUSTOM_PULL_PLANNER_TARGET_KEY = "custom-target-date";
 const WEEKDAY_LABELS = [
   "Chủ nhật",
   "Thứ 2",
@@ -90,12 +92,12 @@ const ORUNDUM_FARMING_SUGGESTIONS = [
       "Universal Certificate từ Kernel banner đổi được Kernel Headhunting Permit, nhưng chỉ dùng cho Kernel/rate-up tương ứng.",
   },
   {
-    title: "Paid pack permit",
+    title: "Paid pack permit (Có trả phí)",
     description:
       "Starter/Monthly Headhunting Pack có Ten-pull Permit; chỉ tính nếu bạn thật sự mua pack, không phải nguồn F2P.",
   },
   {
-    title: "Pro Enhancement Pack",
+    title: "Pro Enhancement Pack (Có thể trả phí)",
     description:
       "Nếu còn pack level mua bằng OP, pack trả Orundum ngang lượng OP quy đổi kèm vật liệu, thường tốt hơn đổi OP thẳng.",
   },
@@ -120,6 +122,26 @@ type PullPlannerTabContentProps = {
     month: number;
     permits: number;
     spent: number;
+  }>;
+  plannerEventRewardEntries: Array<{
+    bannerId: string;
+    bannerName: string;
+    date: string;
+    bonus: {
+      confidence: "high" | "medium" | "low";
+      label: string;
+      note: string;
+      targetOnlyFreePulls: number;
+      targetOnlyPermits: number;
+      transferableOrundum: number;
+      transferablePermits: number;
+    };
+  }>;
+  plannerEventShopEntries: Array<{
+    bannerName: string;
+    bannerType: string;
+    date: string;
+    pulls: number;
   }>;
   plannerIntelligenceCertificates: number;
   plannerIntelligenceOrundum: number;
@@ -147,6 +169,8 @@ export function PullPlannerTabContent({
   plannerCurrentLeftoverOrundum,
   plannerCommendationShopBreakdown,
   plannerDistinctionShopBreakdown,
+  plannerEventRewardEntries,
+  plannerEventShopEntries,
   plannerIntelligenceCertificates,
   plannerIntelligenceOrundum,
   plannerCurrentOrundum,
@@ -180,6 +204,12 @@ export function PullPlannerTabContent({
             WEEKLY_ANNIHILATION_ORUNDUM_STEP,
         ),
       );
+  const parsedTargetPullGoal = Number.parseInt(pullPlanner.targetPulls, 10);
+  const plannerTargetPullGoal = Number.isNaN(parsedTargetPullGoal)
+    ? 0
+    : Math.max(0, Math.floor(parsedTargetPullGoal));
+  const hasPlannerTargetPullGoal = plannerTargetPullGoal > 0;
+  const plannerTargetPullGap = plannerProjectedBannerPulls - plannerTargetPullGoal;
 
   const plannerResourceInputs = [
     {
@@ -216,6 +246,7 @@ export function PullPlannerTabContent({
     detail: string;
     orundum: number;
     permits: number;
+    targetOnlyPulls?: number;
     task: string;
   };
 
@@ -351,6 +382,28 @@ export function PullPlannerTabContent({
     pullPlanner.distinctionShopCurrentMonthClaimed,
     plannerReachableDistinctionShopMonths,
   );
+  const getMonthlyDayOffsets = (dayOfMonth: number) => {
+    if (!selectedPullPlannerTarget?.date) return [];
+
+    const target = new Date(`${selectedPullPlannerTarget.date}T00:00:00`);
+    const offsets: number[] = [];
+    let cursor = new Date(plannerToday.getFullYear(), plannerToday.getMonth(), dayOfMonth);
+
+    while (cursor <= target) {
+      const offset = getLocalDayOffset(cursor);
+      if (offset >= 0 && offset <= plannerDaysUntilBanner) {
+        offsets.push(offset);
+      }
+
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, dayOfMonth);
+    }
+
+    return offsets;
+  };
+  const monthlySignInOffsets = pullPlanner.monthlySignInEnabled
+    ? getMonthlyDayOffsets(DAILY_SIGNIN_PERMIT_DAY)
+    : [];
+  const getDateOffset = (date: string) => getLocalDayOffset(new Date(`${date}T00:00:00`));
   const buildWeekRangeNote = (startOffset: number, dayCount: number) => {
     const start = new Date(plannerToday);
     start.setDate(plannerToday.getDate() + startOffset);
@@ -373,6 +426,7 @@ export function PullPlannerTabContent({
     note: string;
     orundum: number;
     permits: number;
+    targetOnlyPulls: number;
     rows: WeeklyPullTimelineRow[];
   }> = [];
 
@@ -416,8 +470,63 @@ export function PullPlannerTabContent({
       });
     });
 
+    monthlySignInOffsets.forEach((offset) => {
+      const isInSegment =
+        offset >= weeklypullTimelineStartOffset &&
+        (offset <= segmentEndOffset || (isLastSegment && offset === plannerDaysUntilBanner));
+      if (!isInSegment) return;
+
+      rows.push({
+        task: "Monthly sign-in",
+        detail: `Ngày ${DAILY_SIGNIN_PERMIT_DAY}: 1 permit = 600 Orundum = 1 pull`,
+        orundum: 0,
+        permits: 1,
+      });
+    });
+
+    plannerEventRewardEntries.forEach(({ bannerName, date, bonus }) => {
+      const offset = getDateOffset(date);
+      const isInSegment =
+        offset >= weeklypullTimelineStartOffset &&
+        (offset <= segmentEndOffset || (isLastSegment && offset === plannerDaysUntilBanner));
+      if (!isInSegment) return;
+
+      const targetOnlyPulls = bonus.targetOnlyPermits + bonus.targetOnlyFreePulls;
+      const detailParts = [
+        bonus.transferableOrundum > 0 ? `${bonus.transferableOrundum} Orundum` : null,
+        bonus.transferablePermits > 0 ? `${bonus.transferablePermits} permit` : null,
+        targetOnlyPulls > 0
+          ? `${targetOnlyPulls} pull khóa banner (${bonus.targetOnlyPermits} permit + ${bonus.targetOnlyFreePulls} free pull)`
+          : null,
+      ].filter((part): part is string => part !== null);
+
+      rows.push({
+        task: `Event reward: ${bannerName}`,
+        detail: detailParts.join(" | ") || bonus.label,
+        orundum: bonus.transferableOrundum,
+        permits: bonus.transferablePermits,
+        targetOnlyPulls,
+      });
+    });
+
+    plannerEventShopEntries.forEach(({ bannerName, date, pulls }) => {
+      const offset = getDateOffset(date);
+      const isInSegment =
+        offset >= weeklypullTimelineStartOffset &&
+        (offset <= segmentEndOffset || (isLastSegment && offset === plannerDaysUntilBanner));
+      if (!isInSegment) return;
+
+      rows.push({
+        task: `Event shop: ${bannerName}`,
+        detail: `${pulls} permit = ${pulls} pull = ${pulls * 600} Orundum quy đổi`,
+        orundum: 0,
+        permits: pulls,
+      });
+    });
+
     const orundum = rows.reduce((sum, row) => sum + row.orundum, 0);
     const permits = rows.reduce((sum, row) => sum + row.permits, 0);
+    const targetOnlyPulls = rows.reduce((sum, row) => sum + (row.targetOnlyPulls ?? 0), 0);
 
     weeklypullTimeline.push({
       label: `Tuần ${weeklypullTimeline.length + 1}`,
@@ -425,13 +534,14 @@ export function PullPlannerTabContent({
       rows,
       orundum,
       permits,
+      targetOnlyPulls,
     });
 
     weeklypullTimelineRemainingDays -= dayCount;
     weeklypullTimelineStartOffset += dayCount;
   }
   const weeklypullTimelineTotalOrundum = weeklypullTimeline.reduce(
-    (sum, week) => sum + week.orundum + week.permits * 600,
+    (sum, week) => sum + week.orundum + (week.permits + week.targetOnlyPulls) * 600,
     0,
   );
   const weeklypullTimelineTotalPulls = Math.floor(weeklypullTimelineTotalOrundum / 600);
@@ -455,29 +565,82 @@ export function PullPlannerTabContent({
         </div>
 
         {pullPlannerTargets.length > 0 ? (
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700">Banner mục tiêu</label>
-            <select
-              value={selectedPullPlannerTarget?.id ?? ""}
-              onChange={(e) => handlePullPlannerChange("currentBannerKey", e.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-slate-800"
-            >
-              {pullPlannerTargets.map((target) => (
-                <option key={target.id} value={target.id}>
-                  {target.name} - {target.dateLabel}
-                  {target.isPredicted ? " (Dự đoán)" : " (Đã xác nhận)"}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Banner mục tiêu</label>
+              <select
+                value={pullPlanner.currentBannerKey || selectedPullPlannerTarget?.id || ""}
+                onChange={(e) => handlePullPlannerChange("currentBannerKey", e.target.value)}
+                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-slate-800"
+              >
+                {pullPlannerTargets.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.name} - {target.dateLabel}
+                    {target.isPredicted ? " (Dự đoán)" : " (Đã xác nhận)"}
+                  </option>
+                ))}
+                <option value={CUSTOM_PULL_PLANNER_TARGET_KEY}>Ngày tự chọn</option>
+              </select>
+            </div>
+            {pullPlanner.currentBannerKey === CUSTOM_PULL_PLANNER_TARGET_KEY ? (
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <label className="text-sm font-semibold text-slate-700">Ngày muốn tính tới</label>
+                <Input
+                  type="date"
+                  value={pullPlanner.customTargetDate ?? ""}
+                  onChange={(e) => handlePullPlannerChange("customTargetDate", e.target.value)}
+                  className="h-12 rounded-xl border-slate-200 bg-white"
+                />
+              </div>
+            ) : null}
           </div>
         ) : (
-          <Alert className="rounded-xl border-slate-200 bg-slate-50 text-slate-700">
-            <AlertCircle className="h-5 w-5 text-slate-500" />
-            <AlertDescription className="ml-2 text-sm">
-              Chưa có banner tương lai để lên kế hoạch.
-            </AlertDescription>
-          </Alert>
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <Alert className="border-0 bg-transparent p-0 text-slate-700 shadow-none">
+              <AlertCircle className="h-5 w-5 text-slate-500" />
+              <AlertDescription className="ml-2 text-sm">
+                Chưa có banner tương lai để lên kế hoạch. Nhập ngày bạn muốn để planner tự tính.
+              </AlertDescription>
+            </Alert>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Ngày muốn tính tới</label>
+              <Input
+                type="date"
+                value={pullPlanner.customTargetDate ?? ""}
+                onChange={(e) => handlePullPlannerChange("customTargetDate", e.target.value)}
+                className="h-12 rounded-xl border-slate-200 bg-white"
+              />
+            </div>
+          </div>
         )}
+
+        <div className="grid gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Mục tiêu pull</label>
+            <Input
+              type="number"
+              min={0}
+              value={pullPlanner.targetPulls ?? ""}
+              onChange={(e) => handlePullPlannerChange("targetPulls", e.target.value)}
+              placeholder="Ví dụ: 300"
+              className="h-12 rounded-xl border-emerald-200 bg-white focus-visible:ring-emerald-200"
+            />
+          </div>
+          <div className="rounded-lg border border-white bg-white/80 px-4 py-3 text-sm">
+            <p className="font-semibold text-slate-800">
+              {!hasPlannerTargetPullGoal
+                ? "Nhập mục tiêu pull để so sánh"
+                : plannerTargetPullGap >= 0
+                  ? `Đủ mục tiêu, dư ${plannerTargetPullGap} pull`
+                  : `Còn thiếu ${Math.abs(plannerTargetPullGap)} pull`}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {hasPlannerTargetPullGoal
+                ? `Dự kiến ${plannerProjectedBannerPulls} / mục tiêu ${plannerTargetPullGoal} pull.`
+                : `Dự kiến hiện tại: ${plannerProjectedBannerPulls} pull.`}
+            </p>
+          </div>
+        </div>
 
         <div className="space-y-2">
           <p className="text-sm text-slate-600">
@@ -667,8 +830,14 @@ export function PullPlannerTabContent({
             [
               "monthlyCardEnabled",
               "Thẻ tháng",
-              "200 Orundum / ngày",
-              "Bật nếu Monthly Card của bạn còn hiệu lực tới banner.",
+              "Có trả phí - 200 Orundum / ngày",
+              `Phí theo Store trong game. Nếu bật: ${plannerDaysUntilBanner} ngày x 200 = ${
+                plannerDaysUntilBanner * 200
+              } Orundum = ${Math.floor((plannerDaysUntilBanner * 200) / 600)} pull${
+                (plannerDaysUntilBanner * 200) % 600 > 0
+                  ? ` + dư ${(plannerDaysUntilBanner * 200) % 600} Orundum`
+                  : ""
+              }.`,
             ],
             [
               "eventRewardsEnabled",
@@ -781,25 +950,22 @@ export function PullPlannerTabContent({
           </label>
         </div>
 
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="font-semibold text-slate-800">Chi tiết tích pull đến banner bạn muốn</p>
-          </div>
-          <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold text-slate-800">Các tuần tích pull đều đặn</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Liệt kê từng tuần từ hôm nay tới banner; shop, permit sự kiện và quà không đều sẽ nằm ở bảng bên dưới.
-                </p>
-              </div>
+        <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 p-4 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-800">Các tuần tích pull đều đặn</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Liệt kê từng tuần từ hôm nay tới banner; shop, permit sự kiện và quà không đều sẽ nằm ở bảng bên dưới.
+              </p>
             </div>
-            <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
-              {weeklypullTimeline.length > 0 ? (
-                weeklypullTimeline.map((week) => {
-                  const weeklyTotalOrundum = week.orundum + week.permits * 600;
+          </div>
+          <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
+            {weeklypullTimeline.length > 0 ? (
+              weeklypullTimeline.map((week) => {
+                const weeklyTotalOrundum =
+                  week.orundum + (week.permits + week.targetOnlyPulls) * 600;
 
-                  return (
+                return (
                   <div key={week.label} className="rounded-lg border border-white bg-white/80 p-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -828,16 +994,75 @@ export function PullPlannerTabContent({
                       </div>
                     </div>
                   </div>
-                  );
-                })
-              ) : (
-                <p className="rounded-lg border border-white bg-white/80 p-3 text-sm text-slate-500">
-                  Banner đã quá gần hoặc chưa có ngày để chia tuần tích pull.
-                </p>
-              )}
-            </div>
+                );
+              })
+            ) : (
+              <p className="rounded-lg border border-white bg-white/80 p-3 text-sm text-slate-500">
+                Banner đã quá gần hoặc chưa có ngày để chia tuần tích pull.
+              </p>
+            )}
           </div>
         </div>
+
+        {(plannerEventRewardEntries.length > 0 || plannerEventShopEntries.length > 0) && (
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
+            <p className="font-semibold text-slate-800">Nguồn event đã cộng vào kế hoạch</p>
+            <div className="mt-3 space-y-2 text-xs text-slate-600">
+              {plannerEventRewardEntries.map(({ bannerId, bannerName, bonus }) => {
+                const transferablePulls =
+                  bonus.transferablePermits + Math.floor(bonus.transferableOrundum / 600);
+                const targetOnlyPulls =
+                  bonus.targetOnlyPermits + bonus.targetOnlyFreePulls;
+
+                return (
+                  <div key={bannerId} className="rounded-lg border border-white bg-white/80 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-800">{bannerName}</p>
+                        <p className="mt-1 text-slate-500">{bonus.label}</p>
+                      </div>
+                      <Badge variant="outline" className="border-indigo-200 bg-white text-indigo-700">
+                        {bonus.confidence === "high"
+                          ? "Tin cậy cao"
+                          : bonus.confidence === "medium"
+                            ? "Ước tính"
+                            : "Tham khảo"}
+                      </Badge>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <p>
+                        Tài nguyên dùng được mọi banner: {bonus.transferableOrundum} Orundum +{" "}
+                        {bonus.transferablePermits} permit = {transferablePulls} pull
+                        {bonus.transferableOrundum % 600 > 0
+                          ? ` + dư ${bonus.transferableOrundum % 600} Orundum`
+                          : ""}
+                        .
+                      </p>
+                      <p>
+                        Khóa riêng banner target: {bonus.targetOnlyPermits} permit +{" "}
+                        {bonus.targetOnlyFreePulls} free pull = {targetOnlyPulls} pull.
+                      </p>
+                      <p className="text-slate-500">{bonus.note}</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {plannerEventShopEntries.map((entry) => (
+                <div
+                  key={`${entry.bannerName}-${entry.bannerType}`}
+                  className="rounded-lg border border-white bg-white/80 p-3"
+                >
+                  <p className="font-semibold text-slate-800">{entry.bannerName}</p>
+                  <p className="mt-1">
+                    Event shop ({entry.bannerType}): {entry.pulls} permit = {entry.pulls} pull ={" "}
+                    {entry.pulls * 600} Orundum quy đổi.
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
