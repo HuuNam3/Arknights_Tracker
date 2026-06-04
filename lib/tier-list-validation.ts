@@ -1,4 +1,5 @@
-export const TIER_LIST_NAME_MAX_LENGTH = 15;
+export const TIER_LIST_NAME_MAX_LENGTH = 30;
+export const TIER_NAME_MAX_LENGTH = 15;
 
 // Based on blue-eyes-vn/vietnamese-offensive-words. Keep this curated in-app copy
 // small enough to audit, while covering accented, unaccented, and teencode forms.
@@ -88,6 +89,16 @@ const normalizeVietnameseText = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const findOffensiveWord = (value: string) => {
+  const normalizedValue = ` ${normalizeVietnameseText(value)} `;
+
+  return VIETNAMESE_OFFENSIVE_WORDS.find((word) => {
+    const normalizedWord = normalizeVietnameseText(word);
+
+    return normalizedWord ? normalizedValue.includes(` ${normalizedWord} `) : false;
+  });
+};
+
 export const findTierListNameIssue = (name: string) => {
   const trimmedName = name.trim();
 
@@ -99,17 +110,26 @@ export const findTierListNameIssue = (name: string) => {
     return `Tên tier list tối đa ${TIER_LIST_NAME_MAX_LENGTH} ký tự.`;
   }
 
-  const normalizedName = ` ${normalizeVietnameseText(trimmedName)} `;
-  const matchedWord = VIETNAMESE_OFFENSIVE_WORDS.find((word) => {
-    const normalizedWord = normalizeVietnameseText(word);
-
-    if (!normalizedWord) return false;
-
-    return normalizedName.includes(` ${normalizedWord} `);
-  });
-
-  if (matchedWord) {
+  if (findOffensiveWord(trimmedName)) {
     return "Tên tier list có từ/cụm từ có thể phản cảm. Vui lòng đổi tên trước khi lưu.";
+  }
+
+  return "";
+};
+
+export const findTierNameIssue = (name: string) => {
+  const trimmedName = name.trim();
+
+  if (!trimmedName) {
+    return "Vui lòng nhập tên tier trước khi thêm.";
+  }
+
+  if (trimmedName.length > TIER_NAME_MAX_LENGTH) {
+    return `Tên tier tối đa ${TIER_NAME_MAX_LENGTH} ký tự.`;
+  }
+
+  if (findOffensiveWord(trimmedName)) {
+    return "Tên tier có từ/cụm từ có thể phản cảm. Vui lòng đổi tên trước khi thêm.";
   }
 
   return "";

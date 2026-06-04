@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { mongoClientPromise, mongoDbName } from "@/lib/mongodb";
-import { findTierListNameIssue } from "@/lib/tier-list-validation";
+import { findTierListNameIssue, findTierNameIssue } from "@/lib/tier-list-validation";
 
 type TierListDocument = {
   assignments: Record<string, string>;
@@ -45,6 +45,7 @@ const normalizeTierList = (value: any): TierListDocument | null => {
     : [];
 
   if (!name || findTierListNameIssue(name) || tiers.length === 0) return null;
+  if (tiers.some((tier) => findTierNameIssue(tier))) return null;
 
   return {
     assignments,
@@ -104,7 +105,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Invalid tier list payload" }, { status: 400 });
   }
 
+  if (!tierList.authorUid) {
+    return NextResponse.json(
+      { message: "Vui lòng nhập UID trước khi lưu tier list công khai." },
+      { status: 400 },
+    );
+  }
+
   const collection = await getCollection();
+  const existingAuthorTierList = await collection.findOne(
+    {
+      authorUid: tierList.authorUid,
+      id: { $ne: tierList.id },
+    },
+    { projection: { _id: 0, id: 1 } },
+  );
+
+  if (existingAuthorTierList) {
+    return NextResponse.json(
+      {
+        message:
+          "Mỗi UID chỉ được tạo một tier list cho mọi người xem. Bạn vẫn có thể lưu không giới hạn ở mục tạo ở máy.",
+      },
+      { status: 409 },
+    );
+  }
+
   await collection.updateOne(
     { id: tierList.id },
     {

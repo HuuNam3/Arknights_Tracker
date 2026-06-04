@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SiteHeader } from "@/components/site-header";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://arknights-tool.vercel.app";
@@ -77,6 +78,7 @@ export default function RootLayout({
             </footer>
           </main>
         </div>
+        <Toaster richColors position="top-right" />
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>

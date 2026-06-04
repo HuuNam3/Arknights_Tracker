@@ -51,9 +51,12 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { MainTab, ToolTab } from "@/lib/site-navigation";
 import {
+  findTierNameIssue,
   findTierListNameIssue,
+  TIER_NAME_MAX_LENGTH,
   TIER_LIST_NAME_MAX_LENGTH,
 } from "@/lib/tier-list-validation";
 import { BannersTabContent } from "@/components/game-user-page/tabs/banners-tab-content";
@@ -2111,6 +2114,10 @@ export function GameUserPage({
   const tierListNameIssue = tierListName.trim()
     ? findTierListNameIssue(tierListName)
     : "";
+  const showTierListError = (message: string) => {
+    setErrorMessage(message);
+    toast.error(message);
+  };
   const plannerOrundum = Math.max(0, parseNumberInput(pullPlanner.orundum));
   const plannerPrime = Math.max(0, parseNumberInput(pullPlanner.originitePrime));
   const plannerPermits = Math.max(0, parseNumberInput(pullPlanner.permits));
@@ -3283,8 +3290,9 @@ export function GameUserPage({
 
   const handleAddTier = () => {
     const trimmedTierName = newTierName.trim();
-    if (!trimmedTierName) {
-      setErrorMessage("Vui lòng nhập tên tier trước khi thêm.");
+    const tierNameIssue = findTierNameIssue(trimmedTierName);
+    if (tierNameIssue) {
+      showTierListError(tierNameIssue);
       return;
     }
 
@@ -3292,22 +3300,19 @@ export function GameUserPage({
       (tier) => tier.toLowerCase() === trimmedTierName.toLowerCase(),
     );
     if (hasDuplicateTier) {
-      setErrorMessage("Tier này đã tồn tại.");
+      showTierListError("Tier này đã tồn tại.");
       return;
     }
 
     setTierOrder((current) => [...current, trimmedTierName]);
     setNewTierName("");
     setErrorMessage("");
+    toast.success("Đã thêm tier.");
   };
 
   const handleDeleteTier = (tierToDelete: string) => {
     if (tierOrder.length <= 1) {
-      setErrorMessage("Cần giữ lại ít nhất 1 tier.");
-      return;
-    }
-
-    if (!window.confirm(`Xóa tier ${tierToDelete}? Operator trong tier này sẽ bị bỏ xếp hạng.`)) {
+      showTierListError("Cần giữ lại ít nhất 1 tier.");
       return;
     }
 
@@ -3321,6 +3326,7 @@ export function GameUserPage({
       ),
     );
     setErrorMessage("");
+    toast.success(`Đã xóa tier ${tierToDelete}.`);
   };
 
   const handleMoveTier = (tierIndex: number, direction: number) => {
@@ -3401,7 +3407,7 @@ export function GameUserPage({
   const handleToggleSavedTierListLike = async (tierListId: string) => {
     const likedUid = userInfo?.uid ?? uid.trim();
     if (!likedUid) {
-      setErrorMessage("Vui lòng nhập UID trước khi thích tier list.");
+      showTierListError("Vui lòng nhập UID trước khi thích tier list.");
       return;
     }
 
@@ -3414,7 +3420,7 @@ export function GameUserPage({
       const result = await res.json();
 
       if (!res.ok || !Array.isArray(result.likes)) {
-        setErrorMessage(result.message || "Không thể cập nhật lượt thích.");
+        showTierListError(result.message || "Không thể cập nhật lượt thích.");
         return;
       }
 
@@ -3424,9 +3430,10 @@ export function GameUserPage({
         ),
       );
       setErrorMessage("");
+      toast.success("Đã thích tier list.");
     } catch (error) {
       console.error(error);
-      setErrorMessage("Không thể cập nhật lượt thích.");
+      showTierListError("Không thể cập nhật lượt thích.");
     }
   };
 
@@ -3447,27 +3454,21 @@ export function GameUserPage({
       const result = await res.json();
 
       if (!res.ok) {
-        setErrorMessage(result.message || "Không thể xóa tier list.");
+        showTierListError(result.message || "Không thể xóa tier list.");
         return;
       }
 
       setSavedTierLists((current) => current.filter((tierList) => tierList.id !== id));
       setSelectedTierListId((current) => (current === id ? "" : current));
       setErrorMessage("");
+      toast.success("Đã xóa tier list công khai.");
     } catch (error) {
       console.error(error);
-      setErrorMessage("Không thể xóa tier list.");
+      showTierListError("Không thể xóa tier list.");
     }
   };
 
   const handleResetTierListEditor = () => {
-    if (
-      (tierListName.trim() || Object.values(tierAssignments).some(Boolean)) &&
-      !window.confirm("Tạo tier list mới sẽ xóa bản nháp hiện tại. Bạn muốn tiếp tục?")
-    ) {
-      return;
-    }
-
     setTierAssignments({});
     setTierListName("");
     setNewTierName("");
@@ -3476,6 +3477,7 @@ export function GameUserPage({
     setEditingTierListSource("public");
     setTierListView("create");
     setErrorMessage("");
+    toast.success("Đã tạo bản nháp tierlist mới.");
   };
 
   const handleOpenTierListForView = (
@@ -3491,32 +3493,27 @@ export function GameUserPage({
     tierList: SavedTierList,
     source: "public" | "local" = "public",
   ) => {
-    if (!window.confirm("Mở tier list này để sửa? Bản nháp hiện tại có thể bị thay thế.")) {
-      return;
-    }
-
     setTierAssignments(tierList.assignments);
     setTierListName(tierList.name.slice(0, TIER_LIST_NAME_MAX_LENGTH));
     setTierOrder([...tierList.tiers]);
     setEditingTierListId(tierList.id);
     setEditingTierListSource(source);
     setTierListView("create");
+    setErrorMessage("");
+    toast.success("Đã mở tier list để sửa.");
   };
 
   const handleDeleteTierListWithConfirm = async (
     id: string,
     source: "public" | "local" = "public",
   ) => {
-    if (!window.confirm("Bạn chắc chắn muốn xóa tier list này?")) {
-      return;
-    }
-
     if (source === "local") {
       setLocalTierLists((current) => current.filter((tierList) => tierList.id !== id));
       setSelectedTierListId((current) =>
         current === id && selectedTierListSource === "local" ? "" : current,
       );
       setErrorMessage("");
+      toast.success("Đã xóa tier list tạo ở máy.");
       return;
     }
 
@@ -3527,29 +3524,45 @@ export function GameUserPage({
     const trimmedName = tierListName.trim();
     const nameIssue = findTierListNameIssue(trimmedName);
     if (nameIssue) {
-      setErrorMessage(nameIssue);
+      showTierListError(nameIssue);
       return;
     }
 
-    if (
-      !window.confirm(
-        target === "public"
-          ? "Lưu tier list này công khai cho mọi người xem?"
-          : "Lưu tier list này vào local trên máy của bạn?",
-      )
-    ) {
+    const tierNameIssue = tierOrder.map((tier) => findTierNameIssue(tier)).find(Boolean);
+    if (tierNameIssue) {
+      showTierListError(tierNameIssue);
       return;
     }
 
-    const shouldUpdateExisting = Boolean(editingTierListId && editingTierListSource === target);
+    const currentAuthorUid = userInfo?.uid ?? uid.trim();
+    if (target === "public" && !currentAuthorUid) {
+      showTierListError("Vui lòng nhập UID trước khi lưu tier list công khai.");
+      return;
+    }
+
     const existingTierList =
       target === "local"
         ? localTierLists.find((tierList) => tierList.id === editingTierListId)
         : savedTierLists.find((tierList) => tierList.id === editingTierListId);
+    const shouldUpdateExisting = Boolean(
+      editingTierListId &&
+        editingTierListSource === target &&
+        (target === "local" || existingTierList?.authorUid === currentAuthorUid),
+    );
+
+    if (
+      target === "public" &&
+      !shouldUpdateExisting &&
+      savedTierLists.some((tierList) => tierList.authorUid === currentAuthorUid)
+    ) {
+      showTierListError("Mỗi UID chỉ được tạo một tier list cho mọi người xem. Bạn vẫn có thể lưu không giới hạn ở mục tạo ở máy.");
+      return;
+    }
+
     const nextTierList: SavedTierList = {
       assignments: tierAssignments,
       authorName: userInfo?.name ?? "",
-      authorUid: userInfo?.uid ?? uid.trim(),
+      authorUid: currentAuthorUid,
       createdAt: shouldUpdateExisting ? existingTierList?.createdAt ?? Date.now() : Date.now(),
       id: shouldUpdateExisting ? editingTierListId : `${target}-${Date.now()}`,
       likes: target === "public" ? existingTierList?.likes ?? [] : [],
@@ -3568,6 +3581,7 @@ export function GameUserPage({
       setEditingTierListSource("local");
       setTierListView("browse");
       setErrorMessage("");
+      toast.success("Đã lưu tier list tạo ở máy.");
       return;
     }
 
@@ -3580,7 +3594,7 @@ export function GameUserPage({
       const result = await res.json();
 
       if (!res.ok) {
-        setErrorMessage(result.message || "Không thể lưu tier list.");
+        showTierListError(result.message || "Không thể lưu tier list.");
         return;
       }
 
@@ -3595,9 +3609,10 @@ export function GameUserPage({
       setEditingTierListSource("public");
       setTierListView("browse");
       setErrorMessage("");
+      toast.success("Đã lưu tier list cho mọi người xem.");
     } catch (error) {
       console.error(error);
-      setErrorMessage("Không thể lưu tier list.");
+      showTierListError("Không thể lưu tier list.");
     }
   };
 
@@ -3975,6 +3990,7 @@ export function GameUserPage({
                 tierListName={tierListName}
                 tierListNameIssue={tierListNameIssue}
                 tierListNameMaxLength={TIER_LIST_NAME_MAX_LENGTH}
+                tierNameMaxLength={TIER_NAME_MAX_LENGTH}
                 tierListView={tierListView}
                 tierOrder={tierOrder}
                 tierPoolPage={tierPoolPage}

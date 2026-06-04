@@ -100,4 +100,12 @@
       radial-gradient(circle at top right, rgba(253, 186, 116, 0.2), transparent 28%),
       linear-gradient(180deg, hsl(var(--background)) 0%, #eef6f8 100%);
   }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: rgb(30 41 59);
+    box-shadow: 0 0 0 1000px white inset;
+    caret-color: rgb(30 41 59);
+  }
 }

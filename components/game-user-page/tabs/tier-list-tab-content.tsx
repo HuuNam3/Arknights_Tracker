@@ -13,6 +13,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TabsContent } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type TierListTabContentProps = {
   currentUid: string;
@@ -47,6 +58,7 @@ type TierListTabContentProps = {
   tierListName: string;
   tierListNameIssue: string;
   tierListNameMaxLength: number;
+  tierNameMaxLength: number;
   tierListView: string;
   tierOrder: string[];
   tierPoolPage: number;
@@ -91,6 +103,7 @@ export function TierListTabContent({
   tierListName,
   tierListNameIssue,
   tierListNameMaxLength,
+  tierNameMaxLength,
   tierListView,
   tierOrder,
   tierPoolPage,
@@ -493,24 +506,54 @@ export function TierListTabContent({
                     <p className="text-sm font-semibold text-slate-800">Tier cho mọi người xem</p>
                     <p className="text-xs text-slate-400">Bấm vào card để xem, hoặc sửa/xóa bằng nút bên phải.</p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleResetTierListEditor}
-                    className="rounded-lg border-slate-200 text-slate-600"
-                  >
-                    <Plus className="size-4" />
-                    Tạo tierlist mới
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-lg border-slate-200 text-slate-600"
+                      >
+                        <Plus className="size-4" />
+                        Tạo tierlist mới
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Tạo tierlist mới?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Bản nháp hiện tại sẽ được xóa để bắt đầu một tierlist mới.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Hủy</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleResetTierListEditor}
+                          className="bg-slate-900 text-white hover:bg-slate-800"
+                        >
+                          Tạo mới
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
                 {savedTierLists.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                     {savedTierLists.map((tierList) => (
-                      <button
+                      <div
                         key={`create-tier-list-${tierList.id}`}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleOpenSavedTierList(tierList, "public")}
+                        onKeyDown={(event) => {
+                          if (
+                            event.target === event.currentTarget &&
+                            (event.key === "Enter" || event.key === " ")
+                          ) {
+                            event.preventDefault();
+                            handleOpenSavedTierList(tierList, "public");
+                          }
+                        }}
                         className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-rose-200 hover:bg-rose-50/40"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -520,34 +563,71 @@ export function TierListTabContent({
                               {new Date(tierList.createdAt).toLocaleDateString("vi-VN")}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleLoadSavedTierListToEditor(tierList, "public");
-                              }}
-                              className="rounded-lg border-slate-200 text-slate-600"
-                            >
-                              Sửa
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteSavedTierList(tierList.id, "public");
-                              }}
-                              className="rounded-lg border-red-200 text-red-600"
-                            >
-                              Xóa
-                            </Button>
+                          <div
+                            className="flex items-center gap-2"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-lg border-slate-200 text-slate-600"
+                                >
+                                  Sửa
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Mở tier list để sửa?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Bản nháp hiện tại sẽ được thay bằng tier list này.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleLoadSavedTierListToEditor(tierList, "public")}
+                                    className="bg-slate-900 text-white hover:bg-slate-800"
+                                  >
+                                    Mở để sửa
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-lg border-red-200 text-red-600"
+                                >
+                                  Xóa
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Xóa tier list này?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tier list công khai sẽ bị xóa khỏi danh sách mọi người xem.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteSavedTierList(tierList.id, "public")}
+                                    className="bg-red-600 text-white hover:bg-red-700"
+                                  >
+                                    Xóa
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -559,16 +639,26 @@ export function TierListTabContent({
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-3">
-                  <p className="text-sm font-semibold text-slate-800">Tier list cá nhân tạo ở local</p>
+                  <p className="text-sm font-semibold text-slate-800">Tier list cá nhân tạo ở máy</p>
                   <p className="text-xs text-slate-400">Chỉ lưu trên trình duyệt/máy hiện tại của bạn.</p>
                 </div>
                 {localTierLists.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                     {localTierLists.map((tierList) => (
-                      <button
+                      <div
                         key={`local-tier-list-${tierList.id}`}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleOpenSavedTierList(tierList, "local")}
+                        onKeyDown={(event) => {
+                          if (
+                            event.target === event.currentTarget &&
+                            (event.key === "Enter" || event.key === " ")
+                          ) {
+                            event.preventDefault();
+                            handleOpenSavedTierList(tierList, "local");
+                          }
+                        }}
                         className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-sky-200 hover:bg-sky-50/40"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -578,45 +668,82 @@ export function TierListTabContent({
                               {new Date(tierList.createdAt).toLocaleDateString("vi-VN")}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleLoadSavedTierListToEditor(tierList, "local");
-                              }}
-                              className="rounded-lg border-slate-200 text-slate-600"
-                            >
-                              Sửa
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteSavedTierList(tierList.id, "local");
-                              }}
-                              className="rounded-lg border-red-200 text-red-600"
-                            >
-                              Xóa
-                            </Button>
+                          <div
+                            className="flex items-center gap-2"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-lg border-slate-200 text-slate-600"
+                                >
+                                  Sửa
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Mở tier list để sửa?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Bản nháp hiện tại sẽ được thay bằng tier list tạo ở máy này.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleLoadSavedTierListToEditor(tierList, "local")}
+                                    className="bg-slate-900 text-white hover:bg-slate-800"
+                                  >
+                                    Mở để sửa
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-lg border-red-200 text-red-600"
+                                >
+                                  Xóa
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Xóa tier list tạo ở máy?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tier list này sẽ bị xóa khỏi trình duyệt hiện tại.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteSavedTierList(tierList.id, "local")}
+                                    className="bg-red-600 text-white hover:bg-red-700"
+                                  >
+                                    Xóa
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-400">
-                    Chưa có tier list local nào.
+                    Chưa có tier list tạo ở máy nào.
                   </div>
                 )}
               </div>
 
-              <div className="flex flex-col gap-3 xl:flex-row">
-                <div className="space-y-1 xl:max-w-[320px]">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,1fr)_minmax(220px,0.8fr)_auto] lg:items-start">
+                <div className="space-y-1">
                   <Input
                     placeholder="Đặt tên tier list"
                     value={tierListName}
@@ -630,7 +757,7 @@ export function TierListTabContent({
                   />
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <span className={tierListNameIssue ? "text-red-500" : "text-slate-400"}>
-                      {tierListNameIssue || "Tên tối đa 15 ký tự."}
+                      {tierListNameIssue || `Tên tier list tối đa ${tierListNameMaxLength} ký tự.`}
                     </span>
                     <span className="shrink-0 text-slate-400">
                       {tierListName.length}/{tierListNameMaxLength}
@@ -640,21 +767,22 @@ export function TierListTabContent({
                 <Input
                   placeholder="Tạo tier mới, ví dụ SS hoặc Meme"
                   value={newTierName}
+                  maxLength={tierNameMaxLength}
                   onChange={(e) => setNewTierName(e.target.value)}
-                  className="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:ring-rose-400/20 xl:max-w-[320px]"
+                  className="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:ring-rose-400/20"
                 />
                 <Button
                   type="button"
                   onClick={handleAddTier}
-                  className="rounded-xl bg-slate-900 text-white hover:bg-slate-800"
+                  className="h-12 rounded-xl bg-slate-900 px-6 text-white hover:bg-slate-800"
                 >
                   <Plus className="size-4" />
                   Thêm tier
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-3 xl:flex-row">
-                <div className="relative flex-1">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,1fr)_auto_auto_auto] lg:items-center">
+                <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                     <Search className="h-5 w-5 text-slate-400" />
                   </div>
@@ -665,33 +793,89 @@ export function TierListTabContent({
                     className="h-12 rounded-xl border-slate-200 bg-white pl-10 text-base text-slate-800 placeholder:text-slate-400 focus:border-rose-400 focus:ring-rose-400/20"
                   />
                 </div>
-                <Button
-                  type="button"
-                  onClick={() => handleSaveTierList("public")}
-                  className="rounded-xl bg-rose-500 text-white hover:bg-rose-600"
-                >
-                  Lưu tier list
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleSaveTierList("local")}
-                  className="rounded-xl border-sky-200 text-sky-700 hover:bg-sky-50"
-                >
-                  Lưu local
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (window.confirm("Xóa toàn bộ xếp hạng hiện tại?")) {
-                      setTierAssignments({});
-                    }
-                  }}
-                  className="rounded-xl border-slate-200 text-slate-600"
-                >
-                  Xóa xếp hạng
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      className="h-12 rounded-xl bg-rose-500 px-6 text-white hover:bg-rose-600"
+                    >
+                      Lưu tier list
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Lưu tier list cho mọi người xem?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Mỗi UID chỉ được có một tier list công khai. Tier list tạo ở máy không bị giới hạn.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Hủy</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleSaveTierList("public")}
+                        className="bg-rose-500 text-white hover:bg-rose-600"
+                      >
+                        Lưu công khai
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 rounded-xl border-sky-200 px-6 text-sky-700 hover:bg-sky-50"
+                    >
+                      Lưu tạo ở máy
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Lưu tier list tạo ở máy?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tier list này chỉ lưu trên trình duyệt/máy hiện tại và không giới hạn số lượng.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Hủy</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleSaveTierList("local")}
+                        className="border border-sky-200 bg-white text-sky-700 hover:bg-sky-50"
+                      >
+                        Lưu tạo ở máy
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 rounded-xl border-slate-200 px-6 text-slate-600"
+                    >
+                      Xóa xếp hạng
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Xóa toàn bộ xếp hạng hiện tại?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tất cả operator đang được xếp tier trong bản nháp sẽ quay lại pool character.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Hủy</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => setTierAssignments({})}
+                        className="bg-red-600 text-white hover:bg-red-700"
+                      >
+                        Xóa xếp hạng
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -723,17 +907,37 @@ export function TierListTabContent({
                     >
                       <ChevronDown className="size-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleDeleteTier(tier)}
-                      disabled={tierOrder.length <= 1}
-                      className="rounded-full text-rose-500 hover:text-rose-600"
-                      aria-label={`Xóa tier ${tier}`}
-                    >
-                      <X className="size-4" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={tierOrder.length <= 1}
+                          className="rounded-full text-rose-500 hover:text-rose-600"
+                          aria-label={`Xóa tier ${tier}`}
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Xóa tier {tier}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Operator trong tier này sẽ bị bỏ xếp hạng và quay lại pool character.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Hủy</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteTier(tier)}
+                            className="bg-red-600 text-white hover:bg-red-700"
+                          >
+                            Xóa tier
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 ))}
               </div>
