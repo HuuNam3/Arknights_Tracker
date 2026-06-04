@@ -880,7 +880,12 @@ const SPECIAL_WIKI_IMAGE_NAMES = new Map([
   ["Mr.Nothing", "Mr._Nothing"],
 ]);
 
-const getWikiImageName = (charName: string): string => {
+const getWikiImageName = (value: string | null | undefined): string => {
+  if (!value) {
+    return "";
+  }
+
+  const charName = value;
   const specialImageName = SPECIAL_WIKI_IMAGE_NAMES.get(charName);
   if (specialImageName) {
     return specialImageName;
@@ -1237,7 +1242,7 @@ const formatLocalIsoDate = (value: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const formatDisplayDate = (value: string | null) => {
+const formatDisplayDate = (value: string | null | undefined) => {
   if (!value) return null;
 
   const [year, month, day] = value.split("-");
@@ -3318,7 +3323,11 @@ export function GameUserPage({
     setErrorMessage("");
   };
 
-  const handleMoveTier = (tierIndex: number, direction: -1 | 1) => {
+  const handleMoveTier = (tierIndex: number, direction: number) => {
+    if (direction !== -1 && direction !== 1) {
+      return;
+    }
+
     const nextIndex = tierIndex + direction;
     if (nextIndex < 0 || nextIndex >= tierOrder.length) {
       return;
@@ -3643,7 +3652,7 @@ export function GameUserPage({
 
       setSavedTierLists(hydratedTierLists);
       setSelectedTierListId((current) =>
-        current && hydratedTierLists.some((tierList) => tierList.id === current)
+        current && hydratedTierLists.some((tierList: SavedTierList) => tierList.id === current)
           ? current
           : hydratedTierLists[0]?.id ?? "",
       );

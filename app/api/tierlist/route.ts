@@ -24,19 +24,24 @@ const normalizeTierList = (value: any): TierListDocument | null => {
 
   const name = typeof value.name === "string" ? value.name.trim() : "";
   const id = typeof value.id === "string" && value.id ? value.id : `${Date.now()}`;
-  const assignments =
+  const assignments: Record<string, string> =
     value.assignments && typeof value.assignments === "object" && !Array.isArray(value.assignments)
       ? Object.fromEntries(
           Object.entries(value.assignments).filter(
-            ([operatorName, tier]) => typeof operatorName === "string" && typeof tier === "string",
+            (entry): entry is [string, string] =>
+              typeof entry[0] === "string" && typeof entry[1] === "string",
           ),
         )
       : {};
-  const tiers = Array.isArray(value.tiers)
+  const tiers: string[] = Array.isArray(value.tiers)
     ? value.tiers.filter((tier: unknown): tier is string => typeof tier === "string")
     : [];
-  const likes = Array.isArray(value.likes)
-    ? [...new Set(value.likes.filter((uid: unknown): uid is string => typeof uid === "string"))]
+  const likes: string[] = Array.isArray(value.likes)
+    ? Array.from(
+        new Set<string>(
+          value.likes.filter((uid: unknown): uid is string => typeof uid === "string"),
+        ),
+      )
     : [];
 
   if (!name || findTierListNameIssue(name) || tiers.length === 0) return null;
