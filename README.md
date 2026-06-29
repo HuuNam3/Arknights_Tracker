@@ -17,6 +17,8 @@ Website này được xây để phục vụ 2 mục tiêu chính:
   Tính số pull hiện có, tài nguyên tích lũy và khả năng chuẩn bị cho banner mục tiêu.
 - `Operator Planner`
   Chọn operator, đặt mục tiêu Elite, skill và mastery rồi tính vật liệu còn thiếu.
+- `Skin Planner`
+  Chọn outfit muốn mua, tính Originite Prime cần giữ, voucher và số pull tương đương.
 - `Recruitment Calculator`
   Chọn tag để xem các tổ hợp hợp lệ và operator có thể xuất hiện.
 - `Banner Tracker`

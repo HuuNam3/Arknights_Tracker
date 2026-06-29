@@ -2439,6 +2439,13 @@ export function GameUserPage({
       {
         confidence: "medium",
         matches: (sample, target) =>
+          target.type === "collab" && sample.type === target.type,
+        minSamples: 1,
+        reason: "cùng nhóm collab/crossover",
+      },
+      {
+        confidence: "medium",
+        matches: (sample, target) =>
           sample.limited === target.limited &&
           Math.abs(sample.newOperatorCount - target.newOperatorCount) <= 1,
         minSamples: 4,
@@ -4096,3 +4103,4 @@ export function GameUserPage({
     </div>
   );
 }
+

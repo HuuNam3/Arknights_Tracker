@@ -8,6 +8,7 @@ import {
   Hammer,
   ScrollText,
   Shield,
+  Shirt,
   Trophy,
   Users,
 } from "lucide-react";
@@ -31,6 +32,15 @@ const primaryCards = [
     icon: Hammer,
     accent: "from-emerald-300 via-teal-300 to-sky-200",
     surface: "border-emerald-200 bg-white",
+  },
+  {
+    href: "/tools/skin-planner",
+    title: "Skin Planner",
+    description:
+      "Chọn outfit muốn mua, tính OP cần giữ, voucher áp dụng và số pull tương đương.",
+    icon: Shirt,
+    accent: "from-cyan-300 via-sky-300 to-indigo-200",
+    surface: "border-cyan-200 bg-white",
   },
   {
     href: "/tools/recruitment-calculator",
@@ -108,8 +118,14 @@ export function HomeLanding() {
         <AccountLookupHero />
 
         <section className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-            {primaryCards.map((card) => {
+          <div className="grid gap-4 lg:grid-cols-3">
+            {primaryCards
+              .filter(
+                (card) =>
+                  card.href !== "/tools/operator-planner" &&
+                  card.href !== "/tools/skin-planner",
+              )
+              .map((card) => {
               const Icon = card.icon;
 
               return (

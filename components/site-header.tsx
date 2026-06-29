@@ -11,6 +11,7 @@ import {
   Home,
   type LucideIcon,
   ScrollText,
+  Shirt,
   Trophy,
   Users,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const NAV_ICON_MAP: Record<HeaderNavIcon, LucideIcon> = {
   home: Home,
   diamond: Diamond,
   hammer: Hammer,
+  shirt: Shirt,
   users: Users,
   gallery: GalleryHorizontal,
   trophy: Trophy,
