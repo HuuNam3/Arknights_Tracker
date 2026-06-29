@@ -4,6 +4,10 @@ const CURRENT_YEAR = new Date().getUTCFullYear();
 const VISIBLE_BANNER_YEARS = new Set([CURRENT_YEAR, CURRENT_YEAR - 1]);
 const UPCOMING_PAGE = "Headhunting/Banners/Upcoming";
 const BANNER_YEAR_PAGES = ["Headhunting/Banners/2026", "Headhunting/Banners/2025"];
+const YOSTAR_NEWS_PAGE_SIZE = 50;
+const YOSTAR_NEWS_MAX_PAGES = 3;
+const YOSTAR_NEWS_API = (index: number, size: number) =>
+  `https://account.yo-star.com/api/game/news?key=ark&index=${index}&size=${size}`;
 const BANNER_CATEGORY_SECTIONS = [
   ["Limited", "Limited"],
   ["Special", "Special"],
@@ -35,6 +39,38 @@ type BannerRelease = {
 type BannerOperatorEntry = {
   name: string;
   rarity?: string;
+};
+
+type YostarNewsRow = {
+  content?: string;
+  id?: number | string;
+  link?: string;
+  publishTime?: number | string;
+  title?: string;
+};
+
+type NewsBannerAnnouncement = {
+  category: string;
+  enEndDate: string | null;
+  enStartDate: string;
+  name: string;
+  operators: string[];
+  operatorRarities: Record<string, string>;
+};
+
+const MONTHS: Record<string, string> = {
+  January: "01",
+  February: "02",
+  March: "03",
+  April: "04",
+  May: "05",
+  June: "06",
+  July: "07",
+  August: "08",
+  September: "09",
+  October: "10",
+  November: "11",
+  December: "12",
 };
 
 const normalizeBannerCategory = (
@@ -79,10 +115,24 @@ const stripHtml = (value: string) =>
     .replace(/<[^>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, " ")
+    .replace(/&ndash;|&mdash;/g, "-")
     .replace(/\s+/g, " ")
     .trim();
+
+const toIsoDateFromEnglishDate = (value: string | null | undefined) => {
+  if (!value) return null;
+
+  const match = value.match(/\b([A-Z][a-z]+)\s+(\d{1,2}),\s*(\d{4})\b/);
+  if (!match) return null;
+
+  const month = MONTHS[match[1]];
+  if (!month) return null;
+
+  return `${match[3]}-${month}-${match[2].padStart(2, "0")}`;
+};
 
 const normalizeDate = (value: string | null) =>
   value ? value.replace(/\//g, "-") : null;
@@ -175,11 +225,18 @@ const UPCOMING_BANNER_DATE_FALLBACKS: Record<string, string> = {
   [normalizeBannerComparison("[Celebration] Sealed With Time")]: "2026-05-01",
 };
 
+const GLOBAL_BANNER_DATE_FALLBACKS: Record<string, string> = {
+  [normalizeBannerComparison("Quester in Frozen Moments")]: "2026-06-22",
+};
+
 const getKnownUpcomingCnDate = (bannerName: string, sourcePage: string) => {
   if (sourcePage !== UPCOMING_PAGE) return null;
 
   return UPCOMING_BANNER_DATE_FALLBACKS[normalizeBannerComparison(bannerName)] ?? null;
 };
+
+const getKnownGlobalDate = (bannerName: string) =>
+  GLOBAL_BANNER_DATE_FALLBACKS[normalizeBannerComparison(bannerName)] ?? null;
 
 const getSectionMarkup = (html: string, sectionId: string) => {
   const headingPattern = new RegExp(
@@ -329,7 +386,8 @@ const parseBannerRows = (
     const dateRange = extractLabeledDateRange(text, "Date");
     const cnStartDate = cnDateRange.startDate ?? fallbackCnStartDate;
     const cnEndDate = cnDateRange.endDate;
-    const enStartDate = globalDateRange.startDate ?? dateRange.startDate;
+    const enStartDate =
+      globalDateRange.startDate ?? dateRange.startDate ?? getKnownGlobalDate(name);
     const enEndDate = globalDateRange.endDate ?? dateRange.endDate;
 
     if (!cnStartDate && !enStartDate) continue;
@@ -375,6 +433,224 @@ const parseBannerRows = (
   }
 
   return banners;
+};
+
+const fetchGlobalNewsPage = async (index: number, size: number) => {
+  const response = await fetch(YOSTAR_NEWS_API(index, size), {
+    headers: {
+      Accept: "application/json",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+    },
+    next: { revalidate: 60 * 30 },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Yostar news request failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as {
+    code?: number;
+    data?: { rows?: YostarNewsRow[] };
+  };
+
+  if (payload.code !== 0 || !Array.isArray(payload.data?.rows)) {
+    throw new Error("Yostar news payload is invalid");
+  }
+
+  return payload.data.rows;
+};
+
+const fetchRecentGlobalNews = async () => {
+  const rows: YostarNewsRow[] = [];
+
+  for (let page = 1; page <= YOSTAR_NEWS_MAX_PAGES; page += 1) {
+    const pageRows = await fetchGlobalNewsPage(page, YOSTAR_NEWS_PAGE_SIZE);
+    rows.push(...pageRows);
+
+    if (extractBannerAnnouncementsFromNewsRows(rows).length > 0) {
+      break;
+    }
+  }
+
+  return rows;
+};
+
+const normalizeNewsBannerName = (value: string) =>
+  stripHtml(value)
+    .replace(/^\d+\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const parseRateUpOperators = (sectionText: string) => {
+  const operators: string[] = [];
+  const operatorRarities: Record<string, string> = {};
+  const rateUpStartMatch = /following Operators will appear at a higher rate:\s*/i.exec(sectionText);
+  if (!rateUpStartMatch) {
+    return { operators, operatorRarities };
+  }
+
+  const rateUpStart = rateUpStartMatch.index + rateUpStartMatch[0].length;
+  const rateUpText = sectionText
+    .slice(rateUpStart)
+    .split(/\b(?:NOTE|This is a|If you make|After this event|During this event)\b/i)[0];
+  const rateUpMatches = [
+    ...rateUpText.matchAll(
+      /([★☆]{4,6}|[4-6]-star)\s*:\s*([\s\S]*?)(?=(?:[★☆]{4,6}|[4-6]-star)\s*:|NOTE:|This is a|If you make|$)/gi,
+    ),
+  ];
+
+  for (const match of rateUpMatches) {
+    const rarityText = match[1] ?? "";
+    const rarity =
+      rarityText.match(/\d/)?.[0] ?? String((rarityText.match(/★|☆/g) ?? []).length);
+    const names = stripHtml(match[2] ?? "")
+      .split(/\s*\/\s*|\s*,\s*|\s+and\s+/i)
+      .map((name) => name.trim())
+      .filter((name) => Boolean(name) && name.length <= 40 && !/[.:]/.test(name));
+
+    for (const name of names) {
+      if (operators.includes(name)) continue;
+      operators.push(name);
+      operatorRarities[name] = rarity;
+    }
+  }
+
+  return { operators, operatorRarities };
+};
+
+const extractBannerAnnouncementsFromNewsRows = (rows: YostarNewsRow[]) => {
+  const announcements = new Map<string, NewsBannerAnnouncement>();
+
+  for (const row of rows) {
+    const text = stripHtml(`${row.title ?? ""} ${row.content ?? ""}`);
+    if (!/headhunting/i.test(text)) continue;
+
+    const headingMatches = [
+      ...text.matchAll(
+        /(?:LIMITED-TIME\s+)?HEADHUNTING(?:\s+OPEN)?\s*[-–—]\s*([^:]+?)\s+DURATION:\s*([A-Z][a-z]+\s+\d{1,2},\s*\d{4})(?:,[\s\S]*?[-–—]\s*([A-Z][a-z]+\s+\d{1,2},\s*\d{4}))?/gi,
+      ),
+    ];
+
+    for (const match of headingMatches) {
+      const name = normalizeNewsBannerName(match[1] ?? "");
+      const enStartDate = toIsoDateFromEnglishDate(match[2]);
+      const enEndDate = toIsoDateFromEnglishDate(match[3]);
+      if (!name || !enStartDate) continue;
+
+      const sectionStart = match.index ?? 0;
+      const sectionText = text.slice(sectionStart, sectionStart + 2500);
+      const { operators, operatorRarities } = parseRateUpOperators(sectionText);
+      const category = "Special";
+
+      announcements.set(normalizeBannerComparison(name), {
+        category,
+        enEndDate,
+        enStartDate,
+        name,
+        operators,
+        operatorRarities,
+      });
+    }
+
+    const bracketMatches = [
+      ...text.matchAll(
+        /DURATION:\s*([A-Z][a-z]+\s+\d{1,2},\s*\d{4})(?:,[\s\S]*?[-–—]\s*([A-Z][a-z]+\s+\d{1,2},\s*\d{4}))?[\s\S]{0,500}?Headhunting,\s*\[([^\]]+)\],\s*opens/gi,
+      ),
+    ];
+
+    for (const match of bracketMatches) {
+      const name = stripHtml(match[3] ?? "");
+      const enStartDate = toIsoDateFromEnglishDate(match[1]);
+      const enEndDate = toIsoDateFromEnglishDate(match[2]);
+      if (!name || !enStartDate) continue;
+
+      const sectionStart = match.index ?? 0;
+      const sectionText = text.slice(sectionStart, sectionStart + 2500);
+      const { operators, operatorRarities } = parseRateUpOperators(sectionText);
+      const existing = announcements.get(normalizeBannerComparison(name));
+
+      announcements.set(normalizeBannerComparison(name), {
+        category: existing?.category ?? "Special",
+        enEndDate: enEndDate ?? existing?.enEndDate ?? null,
+        enStartDate,
+        name,
+        operators: operators.length > 0 ? operators : existing?.operators ?? [],
+        operatorRarities:
+          Object.keys(operatorRarities).length > 0
+            ? operatorRarities
+            : existing?.operatorRarities ?? {},
+      });
+    }
+  }
+
+  return [...announcements.values()];
+};
+
+const reconcileBannersWithNews = (
+  banners: BannerRelease[],
+  announcements: NewsBannerAnnouncement[],
+) => {
+  if (announcements.length === 0) return banners;
+
+  const merged = new Map<string, BannerRelease>(
+    banners.map((banner) => [normalizeBannerComparison(banner.name), banner]),
+  );
+
+  for (const announcement of announcements) {
+    const key = normalizeBannerComparison(announcement.name);
+    const existing = merged.get(key);
+    const releaseTs = Date.parse(`${announcement.enStartDate}T00:00:00Z`);
+
+    if (existing) {
+      const category = existing.category || announcement.category;
+      merged.set(key, {
+        ...existing,
+        category,
+        current: isBannerCurrentOnGlobal(
+          announcement.enStartDate,
+          announcement.enEndDate ?? existing.enEndDate,
+        ),
+        enEndDate: announcement.enEndDate ?? existing.enEndDate,
+        enStartDate: announcement.enStartDate,
+        globalReleased: true,
+        limited:
+          existing.limited ||
+          category === "Limited" ||
+          /limited/i.test(announcement.category),
+        operators:
+          existing.operators.length > 0 ? existing.operators : announcement.operators,
+        operatorRarities: {
+          ...announcement.operatorRarities,
+          ...existing.operatorRarities,
+        },
+        releaseDate: announcement.enStartDate,
+        releaseTs: Number.isFinite(releaseTs) ? releaseTs : existing.releaseTs,
+      });
+      continue;
+    }
+
+    merged.set(key, {
+      bannerImageUrl: null,
+      category: announcement.category,
+      cnEndDate: null,
+      cnStartDate: null,
+      current: isBannerCurrentOnGlobal(announcement.enStartDate, announcement.enEndDate),
+      enEndDate: announcement.enEndDate,
+      enStartDate: announcement.enStartDate,
+      globalReleased: true,
+      limited: announcement.category === "Limited",
+      name: announcement.name,
+      operators: announcement.operators,
+      operatorRarities: announcement.operatorRarities,
+      releaseDate: announcement.enStartDate,
+      releaseTs: Number.isFinite(releaseTs) ? releaseTs : Date.now(),
+    });
+  }
+
+  return [...merged.values()].sort((a, b) => b.releaseTs - a.releaseTs);
 };
 
 const fetchParsedMarkup = async (page: string) => {
@@ -497,9 +773,17 @@ export async function GET() {
     const upcoming = upcomingMarkup
       ? parseBannerRows(upcomingMarkup.markup, "Upcoming", upcomingMarkup.page)
       : [];
-    const data = mergeBanners(released, upcoming).filter(
-      isBannerInVisibleYearRange,
-    );
+    let data = mergeBanners(released, upcoming);
+
+    try {
+      const newsRows = await fetchRecentGlobalNews();
+      const announcements = extractBannerAnnouncementsFromNewsRows(newsRows);
+      data = reconcileBannersWithNews(data, announcements);
+    } catch (error) {
+      console.error("Failed to reconcile banners with Yostar news", error);
+    }
+
+    data = data.filter(isBannerInVisibleYearRange);
 
     return NextResponse.json({
       count: data.length,

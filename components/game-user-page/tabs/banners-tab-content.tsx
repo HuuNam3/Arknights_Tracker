@@ -31,6 +31,8 @@ type BannersTabContentProps = {
   paginatedBanners: any[];
   setBannerPage: (value: any) => void;
   setBannerSearch: (value: string) => void;
+  setShowReleasedBanners: (value: boolean) => void;
+  showReleasedBanners: boolean;
   upcomingNewOperatorsByBanner: Map<string, Set<string>>;
 };
 
@@ -51,6 +53,8 @@ export function BannersTabContent({
   paginatedBanners,
   setBannerPage,
   setBannerSearch,
+  setShowReleasedBanners,
+  showReleasedBanners,
   upcomingNewOperatorsByBanner,
 }: BannersTabContentProps) {
   return (
@@ -83,6 +87,17 @@ export function BannersTabContent({
               />
             </div>
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+              <button
+                type="button"
+                onClick={() => setShowReleasedBanners(!showReleasedBanners)}
+                className={
+                  showReleasedBanners
+                    ? "h-10 rounded-xl border border-slate-900 bg-slate-900 px-3 text-sm font-bold text-white transition-colors"
+                    : "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                }
+              >
+                Hiện banner đã ra
+              </button>
               <Badge variant="outline" className="border-slate-200 bg-white text-slate-600">
                 {filteredBanners.length} banner
               </Badge>

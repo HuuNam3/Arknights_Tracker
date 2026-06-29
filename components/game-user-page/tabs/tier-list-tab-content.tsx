@@ -171,6 +171,13 @@ export function TierListTabContent({
       }),
     [savedTierLists],
   );
+  const editablePublicTierLists = useMemo(
+    () =>
+      currentUid
+        ? savedTierLists.filter((tierList) => tierList.authorUid === currentUid)
+        : [],
+    [currentUid, savedTierLists],
+  );
   const savedTierListTotalPages = Math.max(
     1,
     Math.ceil(sortedSavedTierLists.length / SAVED_TIER_LISTS_PAGE_SIZE),
@@ -537,9 +544,9 @@ export function TierListTabContent({
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
-                {savedTierLists.length > 0 ? (
+                {editablePublicTierLists.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                    {savedTierLists.map((tierList) => (
+                    {editablePublicTierLists.map((tierList) => (
                       <div
                         key={`create-tier-list-${tierList.id}`}
                         role="button"
@@ -1079,3 +1086,4 @@ export function TierListTabContent({
     </TabsContent>
   );
 }
+

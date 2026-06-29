@@ -2111,6 +2111,7 @@ export function GameUserPage({
   const [bannerError, setBannerError] = useState("");
   const [bannerSearch, setBannerSearch] = useState("");
   const [bannerPage, setBannerPage] = useState(1);
+  const [showReleasedBanners, setShowReleasedBanners] = useState(false);
   const tierListNameIssue = tierListName.trim()
     ? findTierListNameIssue(tierListName)
     : "";
@@ -2517,10 +2518,12 @@ export function GameUserPage({
   const plannerTodayTs = parseIsoDate(plannerTodayIso) ?? Date.now();
   const pullPlannerTargets = bannerData
     .map((banner) => {
+      if (banner.enStartDate) {
+        return null;
+      }
+
       const predictedDate =
-        banner.enStartDate ??
-        bannerPredictionDetailsByKey.get(getBannerKey(banner))?.date ??
-        null;
+        bannerPredictionDetailsByKey.get(getBannerKey(banner))?.date ?? null;
 
       if (!predictedDate) {
         return null;
@@ -2534,12 +2537,9 @@ export function GameUserPage({
       return {
         date: predictedDate,
         dateLabel: formatDisplayDate(predictedDate) ?? predictedDate,
-        details:
-          !banner.enStartDate
-            ? bannerPredictionDetailsByKey.get(getBannerKey(banner)) ?? null
-            : null,
+        details: bannerPredictionDetailsByKey.get(getBannerKey(banner)) ?? null,
         id: getBannerKey(banner),
-        isPredicted: !banner.enStartDate,
+        isPredicted: true,
         name: banner.name,
       };
     })
@@ -2771,23 +2771,28 @@ export function GameUserPage({
     plannerProjectedTransferablePulls + plannerTargetOnlyPulls;
   const plannerProjectedBannerLeftoverOrundum =
     plannerProjectedTransferableLeftoverOrundum;
-  const filteredBanners = [...bannerData]
-    .sort((a, b) => {
-      const aIsReleased = Boolean(a.enStartDate);
-      const bIsReleased = Boolean(b.enStartDate);
+  const getBannerDisplaySortTs = (banner: BannerRelease) => {
+    const isReleased = Boolean(banner.enStartDate);
+    const predictionDetails =
+      bannerPredictionDetailsByKey.get(getBannerKey(banner)) ?? null;
+    const sortDate = isReleased
+      ? banner.enStartDate ?? banner.releaseDate
+      : predictionDetails?.date ?? banner.cnStartDate ?? banner.releaseDate;
+    const sortTs = Date.parse(`${sortDate}T00:00:00Z`);
 
-      if (aIsReleased !== bIsReleased) {
-        return aIsReleased ? 1 : -1;
+    return Number.isFinite(sortTs) ? sortTs : Number.MAX_SAFE_INTEGER;
+  };
+  const filteredBanners = [...bannerData]
+    .filter((banner) => showReleasedBanners || !banner.enStartDate)
+    .sort((a, b) => {
+      const aSortTs = getBannerDisplaySortTs(a);
+      const bSortTs = getBannerDisplaySortTs(b);
+
+      if (aSortTs !== bSortTs) {
+        return aSortTs - bSortTs;
       }
 
-      const aSortTs = aIsReleased
-        ? Date.parse(`${a.enStartDate ?? a.releaseDate}T00:00:00Z`)
-        : Date.parse(`${a.cnStartDate ?? a.releaseDate}T00:00:00Z`);
-      const bSortTs = bIsReleased
-        ? Date.parse(`${b.enStartDate ?? b.releaseDate}T00:00:00Z`)
-        : Date.parse(`${b.cnStartDate ?? b.releaseDate}T00:00:00Z`);
-
-      return bSortTs - aSortTs;
+      return a.name.localeCompare(b.name);
     })
     .filter((banner) => {
       const keyword = normalizeSearchText(bannerSearch);
@@ -3046,7 +3051,7 @@ export function GameUserPage({
 
   useEffect(() => {
     setBannerPage(1);
-  }, [bannerSearch]);
+  }, [bannerSearch, showReleasedBanners]);
 
   useEffect(() => {
     setTierPoolPage(1);
@@ -3445,11 +3450,17 @@ export function GameUserPage({
   };
 
   const handleDeleteSavedTierList = async (id: string) => {
+    const currentAuthorUid = userInfo?.uid ?? uid.trim();
+    if (!currentAuthorUid) {
+      showTierListError("Vui lòng nhập UID trước khi xóa tier list công khai.");
+      return;
+    }
+
     try {
       const res = await fetch("/api/tierlist", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, uid: currentAuthorUid }),
       });
       const result = await res.json();
 
@@ -3952,6 +3963,8 @@ export function GameUserPage({
                 paginatedBanners={paginatedBanners}
                 setBannerPage={setBannerPage}
                 setBannerSearch={setBannerSearch}
+                setShowReleasedBanners={setShowReleasedBanners}
+                showReleasedBanners={showReleasedBanners}
                 upcomingNewOperatorsByBanner={upcomingNewOperatorsByBanner}
               />
 

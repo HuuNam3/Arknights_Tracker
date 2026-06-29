@@ -17,6 +17,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
+      url: `${siteUrl}/tools/operator-planner`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    {
       url: `${siteUrl}/tools/recruitment-calculator`,
       lastModified: new Date(),
       changeFrequency: 'daily',

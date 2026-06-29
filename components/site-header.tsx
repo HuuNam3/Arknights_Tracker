@@ -7,6 +7,7 @@ import {
   Crown,
   Diamond,
   GalleryHorizontal,
+  Hammer,
   Home,
   type LucideIcon,
   ScrollText,
@@ -30,6 +31,7 @@ const isNavItemActive = (pathname: string, href: string) => {
 const NAV_ICON_MAP: Record<HeaderNavIcon, LucideIcon> = {
   home: Home,
   diamond: Diamond,
+  hammer: Hammer,
   users: Users,
   gallery: GalleryHorizontal,
   trophy: Trophy,

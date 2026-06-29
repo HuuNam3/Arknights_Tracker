@@ -86,13 +86,21 @@ export async function GET() {
 export async function DELETE(request: Request) {
   const payload = await request.json();
   const id = typeof payload.id === "string" ? payload.id : "";
+  const uid = typeof payload.uid === "string" ? payload.uid.trim() : "";
 
-  if (!id) {
-    return NextResponse.json({ message: "Missing tier list id" }, { status: 400 });
+  if (!id || !uid) {
+    return NextResponse.json({ message: "Missing tier list id or uid" }, { status: 400 });
   }
 
   const collection = await getCollection();
-  await collection.deleteOne({ id });
+  const result = await collection.deleteOne({ id, authorUid: uid });
+
+  if (result.deletedCount === 0) {
+    return NextResponse.json(
+      { message: "Bạn chỉ có thể xóa tier list do chính UID của bạn tạo." },
+      { status: 403 },
+    );
+  }
 
   return NextResponse.json({ id });
 }

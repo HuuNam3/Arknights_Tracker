@@ -5,6 +5,7 @@ import {
   Diamond,
   Gamepad2,
   GalleryHorizontal,
+  Hammer,
   ScrollText,
   Shield,
   Trophy,
@@ -21,6 +22,15 @@ const primaryCards = [
     icon: Diamond,
     accent: "from-amber-300 via-orange-300 to-yellow-200",
     surface: "border-amber-200 bg-white",
+  },
+  {
+    href: "/tools/operator-planner",
+    title: "Operator Planner",
+    description:
+      "Chọn operator, đặt mốc Elite, skill, mastery và tính vật liệu còn thiếu trước khi farm.",
+    icon: Hammer,
+    accent: "from-emerald-300 via-teal-300 to-sky-200",
+    surface: "border-emerald-200 bg-white",
   },
   {
     href: "/tools/recruitment-calculator",
@@ -98,7 +108,7 @@ export function HomeLanding() {
         <AccountLookupHero />
 
         <section className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
             {primaryCards.map((card) => {
               const Icon = card.icon;
 

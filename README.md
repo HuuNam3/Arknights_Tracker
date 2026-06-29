@@ -15,6 +15,8 @@ Website này được xây để phục vụ 2 mục tiêu chính:
   Tra cứu thông tin Doctor bằng UID.
 - `Pull Planner`
   Tính số pull hiện có, tài nguyên tích lũy và khả năng chuẩn bị cho banner mục tiêu.
+- `Operator Planner`
+  Chọn operator, đặt mục tiêu Elite, skill và mastery rồi tính vật liệu còn thiếu.
 - `Recruitment Calculator`
   Chọn tag để xem các tổ hợp hợp lệ và operator có thể xuất hiện.
 - `Banner Tracker`

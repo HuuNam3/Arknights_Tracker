@@ -1,6 +1,6 @@
 export type MainTab = "tools" | "characters" | "banners" | "tierlist" | "events" | "gacha";
 
-export type ToolTab = "pull-planner" | "recruitment";
+export type ToolTab = "pull-planner" | "recruitment" | "operator-planner";
 
 export type HeaderNavTone =
   | "slate"
@@ -13,6 +13,7 @@ export type HeaderNavTone =
 export type HeaderNavIcon =
   | "home"
   | "diamond"
+  | "hammer"
   | "users"
   | "gallery"
   | "trophy"
@@ -20,6 +21,7 @@ export type HeaderNavIcon =
 
 export const TOOL_TAB_PATHS: Record<ToolTab, string> = {
   "pull-planner": "/tools/pull-planner",
+  "operator-planner": "/tools/operator-planner",
   recruitment: "/tools/recruitment-calculator",
 };
 
@@ -37,6 +39,7 @@ export const getMainTabPath = (tab: MainTab, toolTab: ToolTab = "pull-planner") 
 export const HEADER_NAV_ITEMS = [
   { href: "/", label: "Trang chủ", icon: "home", tone: "slate" },
   { href: "/tools/pull-planner", label: "Pull Planner", icon: "diamond", tone: "amber" },
+  { href: "/tools/operator-planner", label: "Operator Planner", icon: "hammer", tone: "emerald" },
   { href: "/tools/recruitment-calculator", label: "Recruitment", icon: "users", tone: "rose" },
   { href: "/banners", label: "Banners", icon: "gallery", tone: "sky" },
   { href: "/characters", label: "Characters", icon: "users", tone: "emerald" },
