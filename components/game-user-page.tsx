@@ -60,6 +60,7 @@ import {
   TIER_LIST_NAME_MAX_LENGTH,
 } from "@/lib/tier-list-validation";
 import { BannersTabContent } from "@/components/game-user-page/tabs/banners-tab-content";
+import { SkinsTabContent, type UpcomingSkin } from "@/components/game-user-page/tabs/skins-tab-content";
 import { CharactersTabContent } from "@/components/game-user-page/tabs/characters-tab-content";
 import { GachaTabContent } from "@/components/game-user-page/tabs/gacha-tab-content";
 import { NewsTabContent } from "@/components/game-user-page/tabs/news-tab-content";
@@ -1251,7 +1252,7 @@ const formatDisplayDate = (value: string | null | undefined) => {
   const [year, month, day] = value.split("-");
   if (!year || !month || !day) return value;
 
-  return `${month}-${day}-${year}`;
+  return `${day}/${month}/${year}`;
 };
 
 const normalizeSearchText = (value: string) =>
@@ -2107,11 +2108,18 @@ export function GameUserPage({
   const [operatorStarFilter, setOperatorStarFilter] = useState("all");
   const [operatorPage, setOperatorPage] = useState(1);
   const [bannerData, setBannerData] = useState<BannerRelease[]>([]);
+  const [bannerHistoricalSamples, setBannerHistoricalSamples] = useState<BannerRelease[]>([]);
   const [isBannerLoading, setIsBannerLoading] = useState(false);
   const [bannerError, setBannerError] = useState("");
   const [bannerSearch, setBannerSearch] = useState("");
   const [bannerPage, setBannerPage] = useState(1);
   const [showReleasedBanners, setShowReleasedBanners] = useState(false);
+  const [skinData, setSkinData] = useState<UpcomingSkin[]>([]);
+  const [cnPredictedSkins, setCnPredictedSkins] = useState<UpcomingSkin[]>([]);
+  const [isSkinLoading, setIsSkinLoading] = useState(false);
+  const [skinError, setSkinError] = useState("");
+  const [skinSearch, setSkinSearch] = useState("");
+  const [skinPage, setSkinPage] = useState(1);
   const tierListNameIssue = tierListName.trim()
     ? findTierListNameIssue(tierListName)
     : "";
@@ -2382,7 +2390,9 @@ export function GameUserPage({
     return nextMap;
   })();
   const bannerPredictionDetailsByKey = (() => {
-    const historicalSamples = bannerData
+    const historicalSource =
+      bannerHistoricalSamples.length > 0 ? bannerHistoricalSamples : bannerData;
+    const historicalSamples = historicalSource
       .map((banner) => {
         const cnTs = parseIsoDate(banner.cnStartDate);
         const enTs = parseIsoDate(banner.enStartDate);
@@ -2489,14 +2499,14 @@ export function GameUserPage({
         type: getBannerTypeBucket(banner),
       } satisfies BannerLagSample;
 
-      let chosenSamples = historicalSamples.slice(0, 8);
+      let chosenSamples = historicalSamples.slice(0, 5);
       let chosenReason = "mặt bằng banner gần đây";
       let chosenConfidence: BannerPredictionDetails["confidence"] = "low";
 
       for (const strategy of predictionStrategies) {
         const matchedSamples = historicalSamples
           .filter((sample) => strategy.matches(sample, targetSample))
-          .slice(0, 8);
+          .slice(0, 5);
 
         if (matchedSamples.length < strategy.minSamples) continue;
 
@@ -2816,6 +2826,18 @@ export function GameUserPage({
         normalizeSearchText(value).includes(keyword),
       );
     });
+  const filteredSkins = [...skinData, ...cnPredictedSkins]
+    .filter((skin) => {
+      const keyword = normalizeSearchText(skinSearch);
+      if (!keyword) return true;
+
+      return (
+        normalizeSearchText(skin.skinName).includes(keyword) ||
+        normalizeSearchText(skin.operator).includes(keyword) ||
+        normalizeSearchText(skin.brand).includes(keyword)
+      );
+    })
+    .sort((a, b) => (a.durationStart || 0) - (b.durationStart || 0));
   const activeGachaSource = showGachaSixStarOnly
     ? (gachaAllData ?? [])
     : (gachaData ?? []);
@@ -2946,6 +2968,15 @@ export function GameUserPage({
     (bannerPage - 1) * BANNERS_PER_PAGE,
     bannerPage * BANNERS_PER_PAGE,
   );
+  const SKINS_PER_PAGE = 9;
+  const skinTotalPages = Math.max(
+    1,
+    Math.ceil(filteredSkins.length / SKINS_PER_PAGE),
+  );
+  const paginatedSkins = filteredSkins.slice(
+    (skinPage - 1) * SKINS_PER_PAGE,
+    skinPage * SKINS_PER_PAGE,
+  );
 
   const readJsonResponse = async (res: Response) => {
     const raw = await res.text();
@@ -3036,6 +3067,9 @@ export function GameUserPage({
         }
 
         setBannerData(Array.isArray(result?.data) ? result.data : []);
+        setBannerHistoricalSamples(
+          Array.isArray(result?.predictionSamples) ? result.predictionSamples : [],
+        );
       } catch (error) {
         console.error("Failed to fetch banner releases", error);
         setBannerError(
@@ -3053,12 +3087,49 @@ export function GameUserPage({
   }, []);
 
   useEffect(() => {
+    const fetchUpcomingSkins = async () => {
+      setIsSkinLoading(true);
+      setSkinError("");
+
+      try {
+        const res = await fetch("/api/skins/upcoming?cnPerPage=100");
+        const result = await res.json();
+
+        if (!res.ok) {
+          setSkinError(
+            result?.message || "Không thể tải danh sách skin sắp ra mắt.",
+          );
+          setSkinData([]);
+          setCnPredictedSkins([]);
+          return;
+        }
+
+        setSkinData(Array.isArray(result.data) ? result.data : []);
+        setCnPredictedSkins(Array.isArray(result.cnPredicted) ? result.cnPredicted : []);
+      } catch (error) {
+        console.error("Failed to fetch upcoming skins", error);
+        setSkinError("Không thể tải danh sách skin sắp ra mắt.");
+        setSkinData([]);
+        setCnPredictedSkins([]);
+      } finally {
+        setIsSkinLoading(false);
+      }
+    };
+
+    void fetchUpcomingSkins();
+  }, []);
+
+  useEffect(() => {
     setOperatorPage(1);
   }, [operatorSearch, operatorStarFilter]);
 
   useEffect(() => {
     setBannerPage(1);
   }, [bannerSearch, showReleasedBanners]);
+
+  useEffect(() => {
+    setSkinPage(1);
+  }, [skinSearch]);
 
   useEffect(() => {
     setTierPoolPage(1);
@@ -3081,6 +3152,12 @@ export function GameUserPage({
       setBannerPage(bannerTotalPages);
     }
   }, [bannerPage, bannerTotalPages]);
+
+  useEffect(() => {
+    if (skinPage > skinTotalPages) {
+      setSkinPage(skinTotalPages);
+    }
+  }, [skinPage, skinTotalPages]);
 
   useEffect(() => {
     if (userInfo) {
@@ -3959,7 +4036,6 @@ export function GameUserPage({
                 bannerPredictionDetailsByKey={bannerPredictionDetailsByKey}
                 bannerSearch={bannerSearch}
                 bannerTotalPages={bannerTotalPages}
-                earliestReleasedBannerDateByOperator={earliestReleasedBannerDateByOperator}
                 filteredBanners={filteredBanners}
                 formatDisplayDate={formatDisplayDate}
                 getBannerKey={getBannerKey}
@@ -3973,6 +4049,18 @@ export function GameUserPage({
                 setShowReleasedBanners={setShowReleasedBanners}
                 showReleasedBanners={showReleasedBanners}
                 upcomingNewOperatorsByBanner={upcomingNewOperatorsByBanner}
+              />
+
+              <SkinsTabContent
+                filteredSkins={filteredSkins}
+                isSkinLoading={isSkinLoading}
+                paginatedSkins={paginatedSkins}
+                skinError={skinError}
+                skinPage={skinPage}
+                skinSearch={skinSearch}
+                skinTotalPages={skinTotalPages}
+                setSkinPage={setSkinPage}
+                setSkinSearch={setSkinSearch}
               />
 
               <TierListTabContent

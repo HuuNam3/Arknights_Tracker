@@ -86,6 +86,12 @@ const getNavToneStyles = (tone: HeaderNavTone, active: boolean) => {
       idleItem: "bg-white/50 text-slate-600 hover:border-cyan-200 hover:bg-cyan-50/70 hover:text-cyan-900",
       idleIcon: "bg-cyan-100 text-cyan-600",
     },
+    purple: {
+      activeItem: "border-purple-300 bg-purple-50 text-purple-800 shadow-sm",
+      activeIcon: "bg-purple-200 text-purple-800",
+      idleItem: "bg-white/50 text-slate-600 hover:border-purple-200 hover:bg-purple-50/70 hover:text-purple-900",
+      idleIcon: "bg-purple-100 text-purple-600",
+    },
   };
 
   return {

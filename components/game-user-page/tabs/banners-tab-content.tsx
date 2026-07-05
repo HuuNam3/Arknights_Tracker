@@ -20,7 +20,6 @@ type BannersTabContentProps = {
   bannerSearch: string;
   bannerTotalPages: number;
   bannerPredictionDetailsByKey: Map<string, any>;
-  earliestReleasedBannerDateByOperator: Map<string, string>;
   filteredBanners: any[];
   formatDisplayDate: (value: string | null | undefined) => string | null;
   getBannerKey: (banner: any) => string;
@@ -42,7 +41,6 @@ export function BannersTabContent({
   bannerPredictionDetailsByKey,
   bannerSearch,
   bannerTotalPages,
-  earliestReleasedBannerDateByOperator,
   filteredBanners,
   formatDisplayDate,
   getBannerKey,
@@ -211,14 +209,11 @@ export function BannersTabContent({
                             <div className="mt-3 grid w-full grid-cols-2 gap-2">
                               {visibleBannerOperators.map((operatorName) => {
                                 const isNewOperator =
-                                  isCurrentBanner && banner.enStartDate
-                                    ? earliestReleasedBannerDateByOperator.get(operatorName) ===
-                                      banner.enStartDate
-                                    : !isReleased &&
-                                      (upcomingNewOperatorsByBanner
-                                        .get(getBannerKey(banner))
-                                        ?.has(operatorName) ??
-                                        false);
+                                  !isReleased &&
+                                  (upcomingNewOperatorsByBanner
+                                    .get(getBannerKey(banner))
+                                    ?.has(operatorName) ??
+                                    false);
 
                                 return (
                                   <div
@@ -256,11 +251,6 @@ export function BannersTabContent({
                               <p className="mt-2 text-[11px] font-medium text-amber-600">
                                 Dự đoán: {formatDisplayDate(estimatedReleaseDate)}
                               </p>
-                              {predictionDetails ? (
-                                <p className="mt-1 text-[10px] text-slate-500">
-                                  Dựa trên {predictionDetails.sampleSize} banner {predictionDetails.reason}.
-                                </p>
-                              ) : null}
                             </>
                           ) : null}
                         </div>

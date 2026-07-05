@@ -1,18 +1,25 @@
 import { NextResponse } from "next/server";
 
 const CURRENT_YEAR = new Date().getUTCFullYear();
-const VISIBLE_BANNER_YEARS = new Set([CURRENT_YEAR, CURRENT_YEAR - 1]);
+const VISIBLE_BANNER_YEARS = new Set([CURRENT_YEAR]);
 const UPCOMING_PAGE = "Headhunting/Banners/Upcoming";
-const BANNER_YEAR_PAGES = ["Headhunting/Banners/2026", "Headhunting/Banners/2025"];
+const BANNER_YEAR_PAGES = [
+  "Headhunting/Banners/2026",
+  "Headhunting/Banners/2025",
+  "Headhunting/Banners/2024",
+  "Headhunting/Banners/2023",
+  "Headhunting/Banners/2022",
+  "Headhunting/Banners/2021",
+];
 const YOSTAR_NEWS_PAGE_SIZE = 50;
 const YOSTAR_NEWS_MAX_PAGES = 3;
 const YOSTAR_NEWS_API = (index: number, size: number) =>
   `https://account.yo-star.com/api/game/news?key=ark&index=${index}&size=${size}`;
 const BANNER_CATEGORY_SECTIONS = [
-  ["Limited", "Limited"],
-  ["Special", "Special"],
-  ["Standard_Pool", "Standard Pool"],
-  ["Kernel", "Kernel"],
+  ["Limited_Headhunting", "Limited"],
+  ["Special_Headhunting", "Special"],
+  ["Standard_Headhunting", "Standard Pool"],
+  ["Kernel_Headhunting", "Kernel"],
 ] as const;
 const WIKI_PARSE_API = (page: string) =>
   `https://arknights.wiki.gg/api.php?action=parse&page=${encodeURIComponent(
@@ -239,15 +246,29 @@ const getKnownGlobalDate = (bannerName: string) =>
   GLOBAL_BANNER_DATE_FALLBACKS[normalizeBannerComparison(bannerName)] ?? null;
 
 const getSectionMarkup = (html: string, sectionId: string) => {
-  const headingPattern = new RegExp(
+  let headingTag = "h2";
+  let headingPattern = new RegExp(
     `<h2[^>]*>[\\s\\S]*?<span[^>]*id="${sectionId}"[^>]*>[\\s\\S]*?<\\/h2>`,
     "i",
   );
-  const headingMatch = headingPattern.exec(html);
+  let headingMatch = headingPattern.exec(html);
+
+  if (!headingMatch) {
+    headingTag = "h3";
+    headingPattern = new RegExp(
+      `<h3[^>]*>[\\s\\S]*?<span[^>]*id="${sectionId}"[^>]*>[\\s\\S]*?<\\/h3>`,
+      "i",
+    );
+    headingMatch = headingPattern.exec(html);
+  }
+
   if (!headingMatch) return "";
 
   const startIndex = headingMatch.index + headingMatch[0].length;
-  const nextHeadingMatch = /<h2[^>]*>[\s\S]*?<\/h2>/i.exec(html.slice(startIndex));
+  const nextHeadingMatch = new RegExp(
+    `<h[23][^>]*>[\\s\\S]*?<\\/h[23]>`,
+    "i",
+  ).exec(html.slice(startIndex));
   const endIndex = nextHeadingMatch
     ? startIndex + nextHeadingMatch.index
     : html.length;
@@ -435,30 +456,45 @@ const parseBannerRows = (
   return banners;
 };
 
-const fetchGlobalNewsPage = async (index: number, size: number) => {
-  const response = await fetch(YOSTAR_NEWS_API(index, size), {
-    headers: {
-      Accept: "application/json",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    },
-    next: { revalidate: 60 * 30 },
-  });
+const fetchGlobalNewsPage = async (index: number, size: number, attempt = 1): Promise<YostarNewsRow[]> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  if (!response.ok) {
-    throw new Error(`Yostar news request failed with status ${response.status}`);
+  try {
+    const response = await fetch(YOSTAR_NEWS_API(index, size), {
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Yostar news request failed with status ${response.status}`);
+    }
+
+    const payload = (await response.json()) as {
+      code?: number;
+      data?: { rows?: YostarNewsRow[] };
+    };
+
+    if (payload.code !== 0 || !Array.isArray(payload.data?.rows)) {
+      throw new Error("Yostar news payload is invalid");
+    }
+
+    return payload.data.rows;
+  } catch (error) {
+    if (attempt < 3) {
+      console.warn(`Yostar news fetch attempt ${attempt} failed, retrying...`, error);
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      return fetchGlobalNewsPage(index, size, attempt + 1);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const payload = (await response.json()) as {
-    code?: number;
-    data?: { rows?: YostarNewsRow[] };
-  };
-
-  if (payload.code !== 0 || !Array.isArray(payload.data?.rows)) {
-    throw new Error("Yostar news payload is invalid");
-  }
-
-  return payload.data.rows;
 };
 
 const fetchRecentGlobalNews = async () => {
@@ -775,19 +811,15 @@ export async function GET() {
       : [];
     let data = mergeBanners(released, upcoming);
 
-    try {
-      const newsRows = await fetchRecentGlobalNews();
-      const announcements = extractBannerAnnouncementsFromNewsRows(newsRows);
-      data = reconcileBannersWithNews(data, announcements);
-    } catch (error) {
-      console.error("Failed to reconcile banners with Yostar news", error);
-    }
-
+    const predictionSamples = data.filter(
+      (b) => b.cnStartDate !== null && b.enStartDate !== null,
+    );
     data = data.filter(isBannerInVisibleYearRange);
 
     return NextResponse.json({
       count: data.length,
       data,
+      predictionSamples,
       source: [
         ...yearMarkupEntries.map(
           ({ page }) => `https://arknights.wiki.gg/wiki/${page}`,
