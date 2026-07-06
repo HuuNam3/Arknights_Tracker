@@ -469,7 +469,7 @@ export async function GET(request: Request) {
 
     const [charMap, cnSkins] = await Promise.all([
       fetchCharacterMap(),
-      upcomingSkins.length > 0 ? fetchCnOnlySkins() : [],
+      fetchCnOnlySkins(),
     ]);
 
     const cnPredicted = cnSkins.map((skin) => {

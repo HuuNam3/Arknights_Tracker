@@ -1645,7 +1645,7 @@ const getOperatorRarityValue = (operator: OperatorRelease) => {
 };
 
 const LIMITED_BANNER_KEYWORD_REGEX =
-  /limited|celebration|festival|carnival|crossover|collaboration|vision/i;
+  /\b(?:limited(?!-time)|celebration|festival|carnival|crossover|collaboration|vision)\b/i;
 
 const getNormalizedBannerOperatorNames = (banner: BannerRelease) =>
   banner.operators.filter((name) => !isBannerArtifactName(name));
@@ -2118,6 +2118,7 @@ export function GameUserPage({
   const [cnPredictedSkins, setCnPredictedSkins] = useState<UpcomingSkin[]>([]);
   const [isSkinLoading, setIsSkinLoading] = useState(false);
   const [skinError, setSkinError] = useState("");
+  const [showReleasedSkins, setShowReleasedSkins] = useState(false);
   const [skinSearch, setSkinSearch] = useState("");
   const [skinPage, setSkinPage] = useState(1);
   const tierListNameIssue = tierListName.trim()
@@ -2241,8 +2242,17 @@ export function GameUserPage({
     const allOperatorLookup = new Map(
       operatorData.map((operator) => [operator.name, operator] as const),
     );
+    const isBannerUpcoming = (banner: BannerRelease) => {
+      if (!banner.cnStartDate) return false;
+      if (!banner.enStartDate) return true;
+
+      const today = new Date();
+      const todayStart = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+      const bannerTs = Date.parse(`${banner.enStartDate}T00:00:00Z`);
+      return Number.isFinite(bannerTs) && bannerTs >= todayStart;
+    };
     const upcomingBanners = bannerData
-      .filter((banner) => !banner.enStartDate && banner.cnStartDate)
+      .filter((banner) => isBannerUpcoming(banner))
       .sort((a, b) => {
         const aTs = parseIsoDate(a.cnStartDate) ?? a.releaseTs;
         const bTs = parseIsoDate(b.cnStartDate) ?? b.releaseTs;
@@ -2366,7 +2376,15 @@ export function GameUserPage({
     const seenOperators = new Set(releasedOperatorNames);
     const nextMap = new Map<string, Set<string>>();
     const upcomingBanners = bannerData
-      .filter((banner) => !banner.enStartDate && banner.cnStartDate)
+      .filter((banner) => {
+        if (!banner.cnStartDate) return false;
+        if (!banner.enStartDate) return true;
+
+        const today = new Date();
+        const todayStart = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+        const bannerTs = Date.parse(`${banner.enStartDate}T00:00:00Z`);
+        return Number.isFinite(bannerTs) && bannerTs >= todayStart;
+      })
       .sort((a, b) => {
         const aTs = parseIsoDate(a.cnStartDate) ?? a.releaseTs;
         const bTs = parseIsoDate(b.cnStartDate) ?? b.releaseTs;
@@ -2421,7 +2439,7 @@ export function GameUserPage({
       .filter((sample): sample is BannerLagSample => sample !== null)
       .sort((left, right) => right.enTs - left.enTs);
     const defaultLagDays =
-      getMedianValue(historicalSamples.slice(0, 12).map((sample) => sample.lagDays)) ??
+      getMedianValue(historicalSamples.slice(0, 6).map((sample) => sample.lagDays)) ??
       180;
     const predictionStrategies: Array<{
       confidence: BannerPredictionDetails["confidence"];
@@ -2499,14 +2517,14 @@ export function GameUserPage({
         type: getBannerTypeBucket(banner),
       } satisfies BannerLagSample;
 
-      let chosenSamples = historicalSamples.slice(0, 5);
+      let chosenSamples = historicalSamples.slice(0, 3);
       let chosenReason = "mặt bằng banner gần đây";
       let chosenConfidence: BannerPredictionDetails["confidence"] = "low";
 
       for (const strategy of predictionStrategies) {
         const matchedSamples = historicalSamples
           .filter((sample) => strategy.matches(sample, targetSample))
-          .slice(0, 5);
+          .slice(0, 3);
 
         if (matchedSamples.length < strategy.minSamples) continue;
 
@@ -2800,7 +2818,18 @@ export function GameUserPage({
     return Number.isFinite(sortTs) ? sortTs : Number.MAX_SAFE_INTEGER;
   };
   const filteredBanners = [...bannerData]
-    .filter((banner) => showReleasedBanners || !banner.enStartDate)
+    .filter((banner) => {
+      if (showReleasedBanners) return true;
+
+      if (banner.enStartDate) {
+        const today = new Date();
+        const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+        const bannerTs = Date.parse(`${banner.enStartDate}T00:00:00Z`);
+        return Number.isFinite(bannerTs) && bannerTs >= todayUtc;
+      }
+
+      return true;
+    })
     .sort((a, b) => {
       const aSortTs = getBannerDisplaySortTs(a);
       const bSortTs = getBannerDisplaySortTs(b);
@@ -2827,6 +2856,18 @@ export function GameUserPage({
       );
     });
   const filteredSkins = [...skinData, ...cnPredictedSkins]
+    .filter((skin) => {
+      if (showReleasedSkins) return true;
+
+      const today = new Date();
+      const todayStart = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+
+      if (skin.durationStart > 0 && skin.durationStart >= todayStart) return true;
+      if (skin.durationEnd > 0 && skin.durationEnd >= todayStart) return true;
+      if (skin.durationStart === 0) return true;
+
+      return false;
+    })
     .filter((skin) => {
       const keyword = normalizeSearchText(skinSearch);
       if (!keyword) return true;
@@ -2968,7 +3009,7 @@ export function GameUserPage({
     (bannerPage - 1) * BANNERS_PER_PAGE,
     bannerPage * BANNERS_PER_PAGE,
   );
-  const SKINS_PER_PAGE = 9;
+  const SKINS_PER_PAGE = 6;
   const skinTotalPages = Math.max(
     1,
     Math.ceil(filteredSkins.length / SKINS_PER_PAGE),
@@ -3129,7 +3170,7 @@ export function GameUserPage({
 
   useEffect(() => {
     setSkinPage(1);
-  }, [skinSearch]);
+  }, [skinSearch, showReleasedSkins]);
 
   useEffect(() => {
     setTierPoolPage(1);
@@ -4055,6 +4096,8 @@ export function GameUserPage({
                 filteredSkins={filteredSkins}
                 isSkinLoading={isSkinLoading}
                 paginatedSkins={paginatedSkins}
+                showReleasedSkins={showReleasedSkins}
+                setShowReleasedSkins={setShowReleasedSkins}
                 skinError={skinError}
                 skinPage={skinPage}
                 skinSearch={skinSearch}

@@ -120,15 +120,21 @@ export function BannersTabContent({
           ) : (
             <>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {paginatedBanners.map((banner) => {
+                  {paginatedBanners.map((banner) => {
                   const isReleased = Boolean(banner.enStartDate);
+                  const isUpcoming = !banner.enStartDate || (() => {
+                    const today = new Date();
+                    const todayStart = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+                    const bannerTs = Date.parse(`${banner.enStartDate}T00:00:00Z`);
+                    return Number.isFinite(bannerTs) && bannerTs >= todayStart;
+                  })();
                   const isCurrentBanner = Boolean(banner.current);
                   const bannerIsLimited = isBannerLimited(banner);
                   const bannerCategoryLabel = banner.category ?? "Standard Pool";
                   const visibleBannerOperators = getNormalizedBannerOperatorNames(banner);
                   const predictionDetails =
                     bannerPredictionDetailsByKey.get(getBannerKey(banner)) ?? null;
-                  const estimatedReleaseDate = !isReleased ? predictionDetails?.date ?? null : null;
+                  const estimatedReleaseDate = isUpcoming ? predictionDetails?.date ?? null : null;
 
                   return (
                     <Card
@@ -140,12 +146,14 @@ export function BannersTabContent({
                         <div className="mb-3 flex items-start justify-between gap-2">
                           <Badge
                             className={
-                              isReleased
-                                ? "border-sky-200 bg-sky-100 text-sky-700 hover:bg-sky-100"
-                                : "border-cyan-200 bg-cyan-100 text-cyan-700 hover:bg-cyan-100"
+                              isUpcoming
+                                ? "border-cyan-200 bg-cyan-100 text-cyan-700 hover:bg-cyan-100"
+                                : "border-sky-200 bg-sky-100 text-sky-700 hover:bg-sky-100"
                             }
                           >
-                            {isReleased ? formatDisplayDate(banner.enStartDate) ?? "Đã ra" : "Chưa ra"}
+                            {isUpcoming
+                              ? (banner.enStartDate ? formatDisplayDate(banner.enStartDate) : "Chưa ra")
+                              : (formatDisplayDate(banner.enStartDate) ?? "Đã ra")}
                           </Badge>
                           <Badge
                             variant="outline"
@@ -155,7 +163,7 @@ export function BannersTabContent({
                                 : "border-slate-200 bg-slate-50 text-slate-500"
                             }
                           >
-                            {bannerIsLimited ? "Limited" : bannerCategoryLabel}
+                            {bannerCategoryLabel}
                           </Badge>
                         </div>
 
@@ -209,7 +217,7 @@ export function BannersTabContent({
                             <div className="mt-3 grid w-full grid-cols-2 gap-2">
                               {visibleBannerOperators.map((operatorName) => {
                                 const isNewOperator =
-                                  !isReleased &&
+                                  isUpcoming &&
                                   (upcomingNewOperatorsByBanner
                                     .get(getBannerKey(banner))
                                     ?.has(operatorName) ??
@@ -246,7 +254,7 @@ export function BannersTabContent({
                             </div>
                           ) : null}
 
-                          {!isReleased && estimatedReleaseDate ? (
+                          {isUpcoming && estimatedReleaseDate ? (
                             <>
                               <p className="mt-2 text-[11px] font-medium text-amber-600">
                                 Dự đoán: {formatDisplayDate(estimatedReleaseDate)}

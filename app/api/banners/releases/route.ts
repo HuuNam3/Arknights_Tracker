@@ -91,11 +91,11 @@ const normalizeBannerCategory = (
     return "Kernel";
   }
 
-  if (/limited|festival|carnival|celebration|vision/.test(text)) {
+  if (/\b(?:limited(?!-time)|festival|carnival|celebration|vision|crossover|collaboration)\b/i.test(text)) {
     return "Limited";
   }
 
-  if (/special|joint operation|collab|crossover|collaboration/.test(text)) {
+  if (/special|joint operation|collab/.test(text)) {
     return "Special";
   }
 

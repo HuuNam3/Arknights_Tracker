@@ -37,6 +37,8 @@ type SkinsTabContentProps = {
   filteredSkins: UpcomingSkin[];
   isSkinLoading: boolean;
   paginatedSkins: UpcomingSkin[];
+  showReleasedSkins: boolean;
+  setShowReleasedSkins: (value: boolean) => void;
   setSkinPage: (value: any) => void;
   setSkinSearch: (value: string) => void;
   skinError: string;
@@ -58,6 +60,8 @@ export function SkinsTabContent({
   filteredSkins,
   isSkinLoading,
   paginatedSkins,
+  showReleasedSkins,
+  setShowReleasedSkins,
   setSkinPage,
   setSkinSearch,
   skinError,
@@ -95,6 +99,17 @@ export function SkinsTabContent({
               />
             </div>
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+              <button
+                type="button"
+                onClick={() => setShowReleasedSkins(!showReleasedSkins)}
+                className={
+                  showReleasedSkins
+                    ? "h-10 rounded-xl border border-slate-900 bg-slate-900 px-3 text-sm font-bold text-white transition-colors"
+                    : "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                }
+              >
+                Hiện skin đã ra
+              </button>
               <Badge variant="outline" className="border-slate-200 bg-white text-slate-600">
                 {filteredSkins.length} skin
               </Badge>
@@ -138,6 +153,19 @@ export function SkinsTabContent({
                           }
                         >
                           {skin.source === "cn" ? "CN" : skin.category === "new" ? "New" : "Re-edition"}
+                        </Badge>
+                        <Badge
+                          className={
+                            skin.source === "cn" || (skin.durationStart > 0 && skin.durationStart > Date.now())
+                              ? "border-cyan-200 bg-cyan-100 text-cyan-700 hover:bg-cyan-100"
+                              : "border-sky-200 bg-sky-100 text-sky-700 hover:bg-sky-100"
+                          }
+                        >
+                          {skin.source === "cn"
+                            ? "Chưa ra"
+                            : skin.durationStart > 0 && skin.durationStart <= Date.now()
+                              ? formatDate(skin.durationStart)
+                              : "Chưa ra"}
                         </Badge>
                         <div className="flex items-center gap-1.5">
                           {skin.price ? (
@@ -196,11 +224,20 @@ export function SkinsTabContent({
                           {skin.operator}
                         </p>
 
-                        {skin.durationStart && skin.durationEnd ? (
+                        {skin.source === "cn" && skin.durationStart > 0 ? (
                           <p className="mt-2 text-[11px] font-medium text-purple-600">
-                            {skin.source === "cn" ? `Dự kiến: ${formatDate(skin.durationStart)}` : `${formatDate(skin.durationStart)} - ${formatDate(skin.durationEnd)}`}
+                            Dự kiến: {formatDate(skin.durationStart)}
+                          </p>
+                        ) : skin.durationStart > 0 && skin.durationEnd > 0 && skin.durationStart <= Date.now() ? (
+                          <p className="mt-2 text-[11px] font-medium text-purple-600">
+                            Đang bán: {formatDate(skin.durationStart)} - {formatDate(skin.durationEnd)}
+                          </p>
+                        ) : skin.durationStart > 0 && skin.durationEnd > 0 && skin.durationStart > Date.now() ? (
+                          <p className="mt-2 text-[11px] font-medium text-purple-600">
+                            {formatDate(skin.durationStart)} - {formatDate(skin.durationEnd)}
                           </p>
                         ) : null}
+
                       </div>
                     </CardContent>
                   </Card>
