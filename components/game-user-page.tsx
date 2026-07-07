@@ -1044,8 +1044,10 @@ type OperatorRelease = {
 type BannerRelease = {
   bannerImageUrl: string | null;
   category: string;
+  cnEndDate: string | null;
   cnStartDate: string | null;
   current?: boolean;
+  enEndDate: string | null;
   enStartDate: string | null;
   globalReleased: boolean;
   limited: boolean;
@@ -1068,6 +1070,7 @@ type BannerLagSample = {
 type BannerPredictionDetails = {
   confidence: "high" | "medium" | "low";
   date: string;
+  endDate: string | null;
   lagDays: number;
   reason: string;
   sampleSize: number;
@@ -2501,50 +2504,95 @@ export function GameUserPage({
     ];
     const predictions = new Map<string, BannerPredictionDetails>();
 
-    for (const banner of bannerData) {
-      if (banner.enStartDate || !banner.cnStartDate) continue;
+    const anchorBanner = bannerData.find(
+      (b) => b.name === "[Festival] Ashes to Ashes, Ages on Ages",
+    );
+    const anchorCnTs =
+      anchorBanner ? parseIsoDate(anchorBanner.cnStartDate) : null;
+    const anchorEnTs =
+      anchorBanner ? parseIsoDate(anchorBanner.enStartDate) : null;
+    const anchorCnEndTs =
+      anchorBanner ? parseIsoDate(anchorBanner.cnEndDate) : null;
+    const anchorEnEndTs =
+      anchorBanner ? parseIsoDate(anchorBanner.enEndDate) : null;
+    const anchorDuration =
+      anchorCnEndTs !== null && anchorCnTs !== null
+        ? anchorCnEndTs - anchorCnTs
+        : anchorEnEndTs !== null && anchorEnTs !== null
+          ? anchorEnEndTs - anchorEnTs
+          : 14 * DAY_MS;
 
-      const cnTs = parseIsoDate(banner.cnStartDate);
-      if (cnTs === null) continue;
+    if (anchorCnTs !== null && anchorEnTs !== null) {
+      for (const banner of bannerData) {
+        if (banner.enStartDate || !banner.cnStartDate) continue;
 
-      const targetSample = {
-        enTs: cnTs,
-        lagDays: defaultLagDays,
-        limited: isBannerLimited(banner),
-        newOperatorCount:
-          upcomingNewOperatorsByBanner.get(getBannerKey(banner))?.size ?? 0,
-        operatorCount: getNormalizedBannerOperatorNames(banner).length,
-        type: getBannerTypeBucket(banner),
-      } satisfies BannerLagSample;
+        const cnTs = parseIsoDate(banner.cnStartDate);
+        if (cnTs === null) continue;
 
-      let chosenSamples = historicalSamples.slice(0, 3);
-      let chosenReason = "mặt bằng banner gần đây";
-      let chosenConfidence: BannerPredictionDetails["confidence"] = "low";
+        const offsetMs = cnTs - anchorCnTs;
+        const predictedEnTs = anchorEnTs + offsetMs;
 
-      for (const strategy of predictionStrategies) {
-        const matchedSamples = historicalSamples
-          .filter((sample) => strategy.matches(sample, targetSample))
-          .slice(0, 3);
+        const cnEndTs = parseIsoDate(banner.cnEndDate);
+        const predictedEnEndTs = cnEndTs !== null
+          ? anchorEnTs + (cnEndTs - anchorCnTs)
+          : predictedEnTs + anchorDuration;
 
-        if (matchedSamples.length < strategy.minSamples) continue;
-
-        chosenSamples = matchedSamples;
-        chosenReason = strategy.reason;
-        chosenConfidence = strategy.confidence;
-        break;
+        predictions.set(getBannerKey(banner), {
+          confidence: "high",
+          date: formatIsoDate(predictedEnTs),
+          endDate: formatIsoDate(predictedEnEndTs),
+          lagDays: Math.round((predictedEnTs - cnTs) / DAY_MS),
+          reason: "dựa trên lịch CN và banner mốc",
+          sampleSize: 1,
+        });
       }
+    } else {
+      for (const banner of bannerData) {
+        if (banner.enStartDate || !banner.cnStartDate) continue;
 
-      const lagDays =
-        getMedianValue(chosenSamples.map((sample) => sample.lagDays)) ??
-        defaultLagDays;
+        const cnTs = parseIsoDate(banner.cnStartDate);
+        if (cnTs === null) continue;
 
-      predictions.set(getBannerKey(banner), {
-        confidence: chosenConfidence,
-        date: formatIsoDate(cnTs + lagDays * DAY_MS),
-        lagDays,
-        reason: chosenReason,
-        sampleSize: chosenSamples.length,
-      });
+        const targetSample = {
+          enTs: cnTs,
+          lagDays: defaultLagDays,
+          limited: isBannerLimited(banner),
+          newOperatorCount:
+            upcomingNewOperatorsByBanner.get(getBannerKey(banner))?.size ?? 0,
+          operatorCount: getNormalizedBannerOperatorNames(banner).length,
+          type: getBannerTypeBucket(banner),
+        } satisfies BannerLagSample;
+
+        let chosenSamples = historicalSamples.slice(0, 3);
+        let chosenReason = "mặt bằng banner gần đây";
+        let chosenConfidence: BannerPredictionDetails["confidence"] = "low";
+
+        for (const strategy of predictionStrategies) {
+          const matchedSamples = historicalSamples
+            .filter((sample) => strategy.matches(sample, targetSample))
+            .slice(0, 3);
+
+          if (matchedSamples.length < strategy.minSamples) continue;
+
+          chosenSamples = matchedSamples;
+          chosenReason = strategy.reason;
+          chosenConfidence = strategy.confidence;
+          break;
+        }
+
+        const lagDays =
+          getMedianValue(chosenSamples.map((sample) => sample.lagDays)) ??
+          defaultLagDays;
+
+        predictions.set(getBannerKey(banner), {
+          confidence: chosenConfidence,
+          date: formatIsoDate(cnTs + lagDays * DAY_MS),
+          endDate: null,
+          lagDays,
+          reason: chosenReason,
+          sampleSize: chosenSamples.length,
+        });
+      }
     }
 
     return predictions;

@@ -135,6 +135,7 @@ export function BannersTabContent({
                   const predictionDetails =
                     bannerPredictionDetailsByKey.get(getBannerKey(banner)) ?? null;
                   const estimatedReleaseDate = isUpcoming ? predictionDetails?.date ?? null : null;
+                  const estimatedEndDate = isUpcoming ? predictionDetails?.endDate ?? null : null;
 
                   return (
                     <Card
@@ -151,9 +152,11 @@ export function BannersTabContent({
                                 : "border-sky-200 bg-sky-100 text-sky-700 hover:bg-sky-100"
                             }
                           >
-                            {isUpcoming
-                              ? (banner.enStartDate ? formatDisplayDate(banner.enStartDate) : "Chưa ra")
-                              : (formatDisplayDate(banner.enStartDate) ?? "Đã ra")}
+                            {banner.enStartDate
+                              ? (banner.enEndDate
+                                  ? `${formatDisplayDate(banner.enStartDate)} → ${formatDisplayDate(banner.enEndDate)}`
+                                  : formatDisplayDate(banner.enStartDate))
+                              : "Chưa ra"}
                           </Badge>
                           <Badge
                             variant="outline"
@@ -258,6 +261,7 @@ export function BannersTabContent({
                             <>
                               <p className="mt-2 text-[11px] font-medium text-amber-600">
                                 Dự đoán: {formatDisplayDate(estimatedReleaseDate)}
+                                {estimatedEndDate ? ` → ${formatDisplayDate(estimatedEndDate)}` : ""}
                               </p>
                             </>
                           ) : null}
