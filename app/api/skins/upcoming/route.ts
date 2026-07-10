@@ -472,6 +472,24 @@ export async function GET(request: Request) {
       fetchCnOnlySkins(),
     ]);
 
+    let anchorLagMs = 180 * 24 * 60 * 60 * 1000;
+    const upcomingMap = new Map<string, number>();
+    for (const upcoming of upcomingSkins) {
+      const key = normalizeId(upcoming.operator);
+      if (key && !upcomingMap.has(key)) upcomingMap.set(key, upcoming.durationStart);
+    }
+
+    for (const cnSkin of cnSkins) {
+      if (cnSkin.getTime <= 0) continue;
+      const cnOperator = charMap.get(cnSkin.charId);
+      const cnKey = cnOperator ? normalizeId(cnOperator) : normalizeId(cnSkin.charId.replace(/^char_\d+_/, "").replace(/_/g, " "));
+      const globalStart = cnKey ? upcomingMap.get(cnKey) : undefined;
+      if (globalStart) {
+        anchorLagMs = globalStart - cnSkin.getTime * 1000;
+        break;
+      }
+    }
+
     const cnPredicted = cnSkins.map((skin) => {
       const operator = charMap.get(skin.charId) ?? skin.charId.replace(/^char_\d+_/, "");
       const hasWikiIcon = charMap.has(skin.charId);
@@ -479,7 +497,7 @@ export async function GET(request: Request) {
       const id = `${normalizeId(operator)}-${cleanName}`;
       const brand = mapCnBrand(skin.brand);
       const cnRelease = skin.getTime > 0 ? skin.getTime * 1000 : Date.now();
-      const estimatedStart = cnRelease + 180 * 24 * 60 * 60 * 1000;
+      const estimatedStart = cnRelease + anchorLagMs;
       const estimatedEnd = estimatedStart + 21 * 24 * 60 * 60 * 1000;
 
       return {

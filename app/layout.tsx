@@ -1,8 +1,22 @@
 import type { Metadata } from "next";
+import { Roboto, Roboto_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SiteHeader } from "@/components/site-header";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
+
+const roboto = Roboto({
+  weight: ["400", "500", "700"],
+  subsets: ["latin", "latin-ext", "vietnamese"],
+  display: "swap",
+  variable: "--font-roboto",
+});
+
+const robotoMono = Roboto_Mono({
+  subsets: ["latin", "latin-ext", "vietnamese"],
+  display: "swap",
+  variable: "--font-roboto-mono",
+});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://arknights-tool.vercel.app";
 
@@ -67,8 +81,8 @@ export default function RootLayout({
   const copyrightYear = new Date().getFullYear();
 
   return (
-    <html lang="vi" className="dark">
-      <body className="bg-slate-50 font-sans antialiased">
+    <html lang="vi" className={`dark ${roboto.variable} ${robotoMono.variable}`}>
+      <body className="bg-slate-50 antialiased">
         <div className="min-h-screen md:flex">
           <SiteHeader />
           <main className="flex min-h-screen min-w-0 flex-1 flex-col">

@@ -145,17 +145,6 @@ export function SkinsTabContent({
                       <div className="mb-3 flex items-start justify-between gap-2">
                         <Badge
                           className={
-                            skin.source === "cn"
-                              ? "border-purple-200 bg-purple-100 text-purple-700 hover:bg-purple-100"
-                              : skin.category === "new"
-                                ? "border-emerald-200 bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
-                                : "border-amber-200 bg-amber-100 text-amber-700 hover:bg-amber-100"
-                          }
-                        >
-                          {skin.source === "cn" ? "CN" : skin.category === "new" ? "New" : "Re-edition"}
-                        </Badge>
-                        <Badge
-                          className={
                             skin.source === "cn" || (skin.durationStart > 0 && skin.durationStart > Date.now())
                               ? "border-cyan-200 bg-cyan-100 text-cyan-700 hover:bg-cyan-100"
                               : "border-sky-200 bg-sky-100 text-sky-700 hover:bg-sky-100"
@@ -163,8 +152,8 @@ export function SkinsTabContent({
                         >
                           {skin.source === "cn"
                             ? "Chưa ra"
-                            : skin.durationStart > 0 && skin.durationStart <= Date.now()
-                              ? formatDate(skin.durationStart)
+                            : skin.durationStart > 0 && skin.durationStart <= Date.now() && skin.durationEnd > Date.now()
+                              ? formatDate(skin.durationStart) + " - " + formatDate(skin.durationEnd)
                               : "Chưa ra"}
                         </Badge>
                         <div className="flex items-center gap-1.5">
@@ -178,9 +167,11 @@ export function SkinsTabContent({
                               {skin.price}
                             </Badge>
                           ) : null}
-                          <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-500">
-                            {skin.brand}
-                          </Badge>
+                          {skin.source === "cn" && skin.durationStart > 0 && skin.durationEnd > 0 ? (
+                            <Badge className="border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-50">
+                              Dự kiến: {formatDate(skin.durationStart)} - {formatDate(skin.durationEnd)}
+                            </Badge>
+                          ) : null}
                         </div>
                       </div>
 
@@ -224,19 +215,9 @@ export function SkinsTabContent({
                           {skin.operator}
                         </p>
 
-                        {skin.source === "cn" && skin.durationStart > 0 ? (
-                          <p className="mt-2 text-[11px] font-medium text-purple-600">
-                            Dự kiến: {formatDate(skin.durationStart)}
-                          </p>
-                        ) : skin.durationStart > 0 && skin.durationEnd > 0 && skin.durationStart <= Date.now() ? (
-                          <p className="mt-2 text-[11px] font-medium text-purple-600">
-                            Đang bán: {formatDate(skin.durationStart)} - {formatDate(skin.durationEnd)}
-                          </p>
-                        ) : skin.durationStart > 0 && skin.durationEnd > 0 && skin.durationStart > Date.now() ? (
-                          <p className="mt-2 text-[11px] font-medium text-purple-600">
-                            {formatDate(skin.durationStart)} - {formatDate(skin.durationEnd)}
-                          </p>
-                        ) : null}
+                        <p className="mt-2 text-[11px] font-medium text-slate-500">
+                          {skin.brand}
+                        </p>
 
                       </div>
                     </CardContent>

@@ -1058,15 +1058,6 @@ type BannerRelease = {
   releaseTs: number;
 };
 
-type BannerLagSample = {
-  enTs: number;
-  lagDays: number;
-  limited: boolean;
-  newOperatorCount: number;
-  operatorCount: number;
-  type: string;
-};
-
 type BannerPredictionDetails = {
   confidence: "high" | "medium" | "low";
   date: string;
@@ -1656,13 +1647,6 @@ const getNormalizedBannerOperatorNames = (banner: BannerRelease) =>
 const getBannerKey = (banner: BannerRelease) =>
   `${banner.name}-${banner.cnStartDate ?? "cn"}-${banner.enStartDate ?? "en"}`;
 
-const getMedianValue = (values: number[]) => {
-  if (values.length === 0) return null;
-
-  const sortedValues = [...values].sort((left, right) => left - right);
-  return sortedValues[Math.floor(sortedValues.length / 2)] ?? null;
-};
-
 const getPullPlannerEventBonus = (
   banner: BannerRelease | null,
   bannerType: string | null,
@@ -2111,7 +2095,6 @@ export function GameUserPage({
   const [operatorStarFilter, setOperatorStarFilter] = useState("all");
   const [operatorPage, setOperatorPage] = useState(1);
   const [bannerData, setBannerData] = useState<BannerRelease[]>([]);
-  const [bannerHistoricalSamples, setBannerHistoricalSamples] = useState<BannerRelease[]>([]);
   const [isBannerLoading, setIsBannerLoading] = useState(false);
   const [bannerError, setBannerError] = useState("");
   const [bannerSearch, setBannerSearch] = useState("");
@@ -2354,22 +2337,6 @@ export function GameUserPage({
 
       return starMatches && operator.name.toLowerCase().includes(keyword);
     });
-  const earliestReleasedBannerDateByOperator = (() => {
-    const dates = new Map<string, string>();
-
-    for (const banner of bannerData) {
-      if (!banner.enStartDate) continue;
-
-      for (const operatorName of getNormalizedBannerOperatorNames(banner)) {
-        const existingDate = dates.get(operatorName);
-        if (!existingDate || banner.enStartDate < existingDate) {
-          dates.set(operatorName, banner.enStartDate);
-        }
-      }
-    }
-
-    return dates;
-  })();
   const upcomingNewOperatorsByBanner = (() => {
     const releasedOperatorNames = new Set(
       operatorData
@@ -2411,97 +2378,6 @@ export function GameUserPage({
     return nextMap;
   })();
   const bannerPredictionDetailsByKey = (() => {
-    const historicalSource =
-      bannerHistoricalSamples.length > 0 ? bannerHistoricalSamples : bannerData;
-    const historicalSamples = historicalSource
-      .map((banner) => {
-        const cnTs = parseIsoDate(banner.cnStartDate);
-        const enTs = parseIsoDate(banner.enStartDate);
-
-        if (cnTs === null || enTs === null || enTs < cnTs) {
-          return null;
-        }
-
-        const visibleOperators = getNormalizedBannerOperatorNames(banner);
-        const newOperatorCount = visibleOperators.filter(
-          (operatorName) =>
-            banner.enStartDate !== null &&
-            earliestReleasedBannerDateByOperator.get(operatorName) ===
-              banner.enStartDate,
-        ).length;
-
-        return {
-          enTs,
-          lagDays: Math.round((enTs - cnTs) / DAY_MS),
-          limited: isBannerLimited(banner),
-          newOperatorCount,
-          operatorCount: visibleOperators.length,
-          type: getBannerTypeBucket(banner),
-        } satisfies BannerLagSample;
-      })
-      .filter((sample): sample is BannerLagSample => sample !== null)
-      .sort((left, right) => right.enTs - left.enTs);
-    const defaultLagDays =
-      getMedianValue(historicalSamples.slice(0, 6).map((sample) => sample.lagDays)) ??
-      180;
-    const predictionStrategies: Array<{
-      confidence: BannerPredictionDetails["confidence"];
-      matches: (sample: BannerLagSample, target: BannerLagSample) => boolean;
-      minSamples: number;
-      reason: string;
-    }> = [
-      {
-        confidence: "high",
-        matches: (sample, target) =>
-          sample.type === target.type &&
-          sample.limited === target.limited &&
-          Math.abs(sample.operatorCount - target.operatorCount) <= 2 &&
-          Math.abs(sample.newOperatorCount - target.newOperatorCount) <= 1,
-        minSamples: 2,
-        reason: "cùng loại banner, quy mô rate-up và số operator mới gần giống",
-      },
-      {
-        confidence: "high",
-        matches: (sample, target) =>
-          sample.type === target.type && sample.limited === target.limited,
-        minSamples: 3,
-        reason: "cùng loại banner",
-      },
-      {
-        confidence: "medium",
-        matches: (sample, target) =>
-          target.type === "collab" && sample.type === target.type,
-        minSamples: 1,
-        reason: "cùng nhóm collab/crossover",
-      },
-      {
-        confidence: "medium",
-        matches: (sample, target) =>
-          sample.limited === target.limited &&
-          Math.abs(sample.newOperatorCount - target.newOperatorCount) <= 1,
-        minSamples: 4,
-        reason: "cùng nhóm limited và độ mới tương đương",
-      },
-      {
-        confidence: "medium",
-        matches: (sample, target) => sample.limited === target.limited,
-        minSamples: 4,
-        reason: "cùng nhóm limited hoặc non-limited",
-      },
-      {
-        confidence: "low",
-        matches: (sample, target) =>
-          Math.abs(sample.newOperatorCount - target.newOperatorCount) <= 1,
-        minSamples: 4,
-        reason: "số operator mới tương đương",
-      },
-      {
-        confidence: "low",
-        matches: () => true,
-        minSamples: 1,
-        reason: "mặt bằng banner gần đây",
-      },
-    ];
     const predictions = new Map<string, BannerPredictionDetails>();
 
     const anchorBanner = bannerData.find(
@@ -2547,50 +2423,39 @@ export function GameUserPage({
         });
       }
     } else {
+      const bannersWithDates = bannerData
+        .filter((b) => b.cnStartDate && b.enStartDate)
+        .sort((a, b) => ((b.enStartDate ?? "").localeCompare(a.enStartDate ?? "")))
+        .slice(0, 6);
+      const avgLag = bannersWithDates.length > 0
+        ? Math.round(
+            bannersWithDates.reduce((sum, b) => {
+              const cnTs = parseIsoDate(b.cnStartDate);
+              const enTs = parseIsoDate(b.enStartDate);
+              return cnTs && enTs ? sum + (enTs - cnTs) / DAY_MS : sum;
+            }, 0) / bannersWithDates.length
+          )
+        : 180;
+
       for (const banner of bannerData) {
         if (banner.enStartDate || !banner.cnStartDate) continue;
 
         const cnTs = parseIsoDate(banner.cnStartDate);
         if (cnTs === null) continue;
 
-        const targetSample = {
-          enTs: cnTs,
-          lagDays: defaultLagDays,
-          limited: isBannerLimited(banner),
-          newOperatorCount:
-            upcomingNewOperatorsByBanner.get(getBannerKey(banner))?.size ?? 0,
-          operatorCount: getNormalizedBannerOperatorNames(banner).length,
-          type: getBannerTypeBucket(banner),
-        } satisfies BannerLagSample;
-
-        let chosenSamples = historicalSamples.slice(0, 3);
-        let chosenReason = "mặt bằng banner gần đây";
-        let chosenConfidence: BannerPredictionDetails["confidence"] = "low";
-
-        for (const strategy of predictionStrategies) {
-          const matchedSamples = historicalSamples
-            .filter((sample) => strategy.matches(sample, targetSample))
-            .slice(0, 3);
-
-          if (matchedSamples.length < strategy.minSamples) continue;
-
-          chosenSamples = matchedSamples;
-          chosenReason = strategy.reason;
-          chosenConfidence = strategy.confidence;
-          break;
-        }
-
-        const lagDays =
-          getMedianValue(chosenSamples.map((sample) => sample.lagDays)) ??
-          defaultLagDays;
+        const predictedEnTs = cnTs + avgLag * DAY_MS;
+        const cnEndTs = parseIsoDate(banner.cnEndDate);
+        const predictedEnEndTs = cnEndTs !== null
+          ? cnEndTs + avgLag * DAY_MS
+          : predictedEnTs + 14 * DAY_MS;
 
         predictions.set(getBannerKey(banner), {
-          confidence: chosenConfidence,
-          date: formatIsoDate(cnTs + lagDays * DAY_MS),
-          endDate: null,
-          lagDays,
-          reason: chosenReason,
-          sampleSize: chosenSamples.length,
+          confidence: "medium",
+          date: formatIsoDate(predictedEnTs),
+          endDate: formatIsoDate(predictedEnEndTs),
+          lagDays: avgLag,
+          reason: "dựa trên lịch CN gần đây",
+          sampleSize: bannersWithDates.length,
         });
       }
     }
@@ -3156,9 +3021,6 @@ export function GameUserPage({
         }
 
         setBannerData(Array.isArray(result?.data) ? result.data : []);
-        setBannerHistoricalSamples(
-          Array.isArray(result?.predictionSamples) ? result.predictionSamples : [],
-        );
       } catch (error) {
         console.error("Failed to fetch banner releases", error);
         setBannerError(
