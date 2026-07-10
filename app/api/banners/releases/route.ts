@@ -39,6 +39,7 @@ type BannerRelease = {
   name: string;
   operators: string[];
   operatorRarities: Record<string, string>;
+  operatorRateUp: Record<string, "primary" | "secondary" | "shop">;
   releaseDate: string;
   releaseTs: number;
 };
@@ -46,6 +47,7 @@ type BannerRelease = {
 type BannerOperatorEntry = {
   name: string;
   rarity?: string;
+  rateUp?: "primary" | "secondary" | "shop";
 };
 
 type YostarNewsRow = {
@@ -246,27 +248,32 @@ const getKnownGlobalDate = (bannerName: string) =>
   GLOBAL_BANNER_DATE_FALLBACKS[normalizeBannerComparison(bannerName)] ?? null;
 
 const getSectionMarkup = (html: string, sectionId: string) => {
-  let headingTag = "h2";
-  let headingPattern = new RegExp(
-    `<h2[^>]*>[\\s\\S]*?<span[^>]*id="${sectionId}"[^>]*>[\\s\\S]*?<\\/h2>`,
-    "i",
-  );
-  let headingMatch = headingPattern.exec(html);
+  const tryMatch = (tag: string) => {
+    const patterns = [
+      new RegExp(`<${tag}[^>]*\\s+id="${sectionId}"[^>]*>[\\s\\S]*?<\\/${tag}>`, "i"),
+      new RegExp(`<${tag}[^>]*>[\\s\\S]*?<span[^>]*id="${sectionId}"[^>]*>[\\s\\S]*?<\\/${tag}>`, "i"),
+    ];
+
+    for (const pattern of patterns) {
+      const match = pattern.exec(html);
+      if (match) return match;
+    }
+
+    return null;
+  };
+
+  let headingMatch = tryMatch("h2");
 
   if (!headingMatch) {
-    headingTag = "h3";
-    headingPattern = new RegExp(
-      `<h3[^>]*>[\\s\\S]*?<span[^>]*id="${sectionId}"[^>]*>[\\s\\S]*?<\\/h3>`,
-      "i",
-    );
-    headingMatch = headingPattern.exec(html);
+    headingMatch = tryMatch("h3");
   }
 
   if (!headingMatch) return "";
 
+  const headingTag = headingMatch[0].startsWith("<h2") ? "h2" : "h3";
   const startIndex = headingMatch.index + headingMatch[0].length;
   const nextHeadingMatch = new RegExp(
-    `<h[23][^>]*>[\\s\\S]*?<\\/h[23]>`,
+    `<${headingTag}[^>]*>[\\s\\S]*?<\\/${headingTag}>`,
     "i",
   ).exec(html.slice(startIndex));
   const endIndex = nextHeadingMatch
@@ -324,12 +331,13 @@ const extractOperatorNames = (cellHtml: string, bannerName: string) => {
   const entries: BannerOperatorEntry[] = [];
   const tooltipBlocks = [
     ...cellHtml.matchAll(
-      /<div class="character-tooltip"([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/gi,
+      /(<div[^>]*?position:relative[^>]*?>)?\s*<div\s+class="a">\s*<div class="character-tooltip"([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/gi,
     ),
   ];
 
   for (const block of tooltipBlocks) {
-    const attributes = block[1] ?? "";
+    const wrapperHtml = block[1] ?? "";
+    const attributes = block[2] ?? "";
     const nameMatch = attributes.match(/data-name="([^"]+)"/i);
     const rarityMatch = attributes.match(/data-star="(\d+)"/i);
     const candidate = stripHtml(nameMatch?.[1] ?? "");
@@ -337,14 +345,24 @@ const extractOperatorNames = (cellHtml: string, bannerName: string) => {
     if (!isValidOperatorCandidate(candidate, bannerName)) continue;
     if (entries.some((entry) => entry.name === candidate)) continue;
 
+    let rateUp: "primary" | "secondary" | undefined;
+    if (/border:\s*1px\s+solid\s+#FF0000/i.test(wrapperHtml)) {
+      rateUp = "primary";
+    } else if (/border:\s*1px\s+solid\s+#FF8000/i.test(wrapperHtml)) {
+      rateUp = "secondary";
+    } else if (/border:\s*1px\s+solid\s+#FFFF00/i.test(wrapperHtml)) {
+      rateUp = "shop";
+    }
+
     entries.push({
       name: candidate,
       rarity: rarityMatch?.[1],
+      rateUp,
     });
   }
 
   if (entries.length > 0) {
-    return entries.slice(0, 12);
+    return entries.slice(0, 36);
   }
 
   const fallbackCandidates = [...cellHtml.matchAll(/title="([^"]+)"|alt="([^"]+)"/gi)]
@@ -356,7 +374,7 @@ const extractOperatorNames = (cellHtml: string, bannerName: string) => {
     entries.push({ name: candidate });
   }
 
-  return entries.slice(0, 12);
+  return entries.slice(0, 36);
 };
 
 const extractBannerImageUrl = (cellHtml: string, bannerName: string) => {
@@ -447,6 +465,11 @@ const parseBannerRows = (
         operatorEntries
           .filter((entry) => entry.rarity)
           .map((entry) => [entry.name, entry.rarity as string]),
+      ),
+      operatorRateUp: Object.fromEntries(
+        operatorEntries
+          .filter((entry): entry is BannerOperatorEntry & { rateUp: "primary" | "secondary" | "shop" } => !!entry.rateUp)
+          .map((entry) => [entry.name, entry.rateUp]),
       ),
       releaseDate,
       releaseTs,
@@ -662,6 +685,7 @@ const reconcileBannersWithNews = (
           ...announcement.operatorRarities,
           ...existing.operatorRarities,
         },
+        operatorRateUp: existing.operatorRateUp,
         releaseDate: announcement.enStartDate,
         releaseTs: Number.isFinite(releaseTs) ? releaseTs : existing.releaseTs,
       });
@@ -681,6 +705,7 @@ const reconcileBannersWithNews = (
       name: announcement.name,
       operators: announcement.operators,
       operatorRarities: announcement.operatorRarities,
+      operatorRateUp: {},
       releaseDate: announcement.enStartDate,
       releaseTs: Number.isFinite(releaseTs) ? releaseTs : Date.now(),
     });
@@ -785,6 +810,10 @@ const mergeBanners = (released: BannerRelease[], upcoming: BannerRelease[]) => {
         ...existing.operatorRarities,
         ...banner.operatorRarities,
       },
+      operatorRateUp: {
+        ...existing.operatorRateUp,
+        ...banner.operatorRateUp,
+      },
       releaseDate,
       releaseTs: Number.isFinite(releaseTs) ? releaseTs : existing.releaseTs,
     });
@@ -814,7 +843,16 @@ export async function GET() {
     const predictionSamples = data.filter(
       (b) => b.cnStartDate !== null && b.enStartDate !== null,
     );
-    data = data.filter(isBannerInVisibleYearRange);
+    data = data.filter((banner) => {
+      if (!banner.enStartDate) return true;
+
+      if (banner.current) return true;
+
+      const today = new Date();
+      const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+      const bannerTs = Date.parse(`${banner.enStartDate}T00:00:00Z`);
+      return !(Number.isFinite(bannerTs) && bannerTs < todayUtc);
+    });
 
     return NextResponse.json({
       count: data.length,

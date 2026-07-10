@@ -81,7 +81,7 @@ export default function RootLayout({
   const copyrightYear = new Date().getFullYear();
 
   return (
-    <html lang="vi" className={`dark ${roboto.variable} ${robotoMono.variable}`}>
+    <html lang="vi" className={`${roboto.variable} ${robotoMono.variable}`}>
       <body className="bg-slate-50 antialiased">
         <div className="min-h-screen md:flex">
           <SiteHeader />

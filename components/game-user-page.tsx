@@ -2098,8 +2098,6 @@ export function GameUserPage({
   const [isBannerLoading, setIsBannerLoading] = useState(false);
   const [bannerError, setBannerError] = useState("");
   const [bannerSearch, setBannerSearch] = useState("");
-  const [bannerPage, setBannerPage] = useState(1);
-  const [showReleasedBanners, setShowReleasedBanners] = useState(false);
   const [skinData, setSkinData] = useState<UpcomingSkin[]>([]);
   const [cnPredictedSkins, setCnPredictedSkins] = useState<UpcomingSkin[]>([]);
   const [isSkinLoading, setIsSkinLoading] = useState(false);
@@ -2730,20 +2728,7 @@ export function GameUserPage({
 
     return Number.isFinite(sortTs) ? sortTs : Number.MAX_SAFE_INTEGER;
   };
-  const filteredBanners = [...bannerData]
-    .filter((banner) => {
-      if (showReleasedBanners) return true;
-
-      if (banner.enStartDate) {
-        const today = new Date();
-        const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-        const bannerTs = Date.parse(`${banner.enStartDate}T00:00:00Z`);
-        return Number.isFinite(bannerTs) && bannerTs >= todayUtc;
-      }
-
-      return true;
-    })
-    .sort((a, b) => {
+  const filteredBanners = [...bannerData].sort((a, b) => {
       const aSortTs = getBannerDisplaySortTs(a);
       const bSortTs = getBannerDisplaySortTs(b);
 
@@ -2759,8 +2744,6 @@ export function GameUserPage({
 
       const searchableValues = [
         banner.name,
-        banner.category,
-        `[${banner.category}] ${banner.name}`,
         ...getNormalizedBannerOperatorNames(banner),
       ];
 
@@ -2912,15 +2895,6 @@ export function GameUserPage({
   const paginatedOperators = filteredOperators.slice(
     (operatorPage - 1) * OPERATORS_PER_PAGE,
     operatorPage * OPERATORS_PER_PAGE,
-  );
-  const BANNERS_PER_PAGE = 6;
-  const bannerTotalPages = Math.max(
-    1,
-    Math.ceil(filteredBanners.length / BANNERS_PER_PAGE),
-  );
-  const paginatedBanners = filteredBanners.slice(
-    (bannerPage - 1) * BANNERS_PER_PAGE,
-    bannerPage * BANNERS_PER_PAGE,
   );
   const SKINS_PER_PAGE = 6;
   const skinTotalPages = Math.max(
@@ -3075,10 +3049,6 @@ export function GameUserPage({
   }, [operatorSearch, operatorStarFilter]);
 
   useEffect(() => {
-    setBannerPage(1);
-  }, [bannerSearch, showReleasedBanners]);
-
-  useEffect(() => {
     setSkinPage(1);
   }, [skinSearch, showReleasedSkins]);
 
@@ -3097,12 +3067,6 @@ export function GameUserPage({
       setTierPoolPage(tierPoolTotalPages);
     }
   }, [tierPoolPage, tierPoolTotalPages]);
-
-  useEffect(() => {
-    if (bannerPage > bannerTotalPages) {
-      setBannerPage(bannerTotalPages);
-    }
-  }, [bannerPage, bannerTotalPages]);
 
   useEffect(() => {
     if (skinPage > skinTotalPages) {
@@ -3872,7 +3836,6 @@ export function GameUserPage({
         .glass-card:hover {
           border: 1px solid rgba(14, 165, 233, 0.42);
           box-shadow: 0 20px 46px -14px rgba(46, 116, 148, 0.28), 0 0 24px rgba(125, 211, 252, 0.14);
-          transform: translateY(-4px);
         }
         .hero-panel {
           background: #ffffff;
@@ -3903,7 +3866,7 @@ export function GameUserPage({
       `}</style>
 
       <div
-        className={`relative z-10 ${renderStandaloneToolPage ? "w-full" : "mx-auto max-w-5xl"}`}
+        className={`relative z-10 ${renderStandaloneToolPage ? "w-full" : "w-full px-4 sm:px-6"}`}
       >
         {/* Main Content */}
         <div className="animate-fade-in stagger-2">
@@ -3983,10 +3946,8 @@ export function GameUserPage({
 
               <BannersTabContent
                 bannerError={bannerError}
-                bannerPage={bannerPage}
                 bannerPredictionDetailsByKey={bannerPredictionDetailsByKey}
                 bannerSearch={bannerSearch}
-                bannerTotalPages={bannerTotalPages}
                 filteredBanners={filteredBanners}
                 formatDisplayDate={formatDisplayDate}
                 getBannerKey={getBannerKey}
@@ -3994,11 +3955,7 @@ export function GameUserPage({
                 getWikiImageName={getWikiImageName}
                 isBannerLimited={isBannerLimited}
                 isBannerLoading={isBannerLoading}
-                paginatedBanners={paginatedBanners}
-                setBannerPage={setBannerPage}
                 setBannerSearch={setBannerSearch}
-                setShowReleasedBanners={setShowReleasedBanners}
-                showReleasedBanners={showReleasedBanners}
                 upcomingNewOperatorsByBanner={upcomingNewOperatorsByBanner}
               />
 
