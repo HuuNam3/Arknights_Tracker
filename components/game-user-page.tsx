@@ -2098,13 +2098,10 @@ export function GameUserPage({
   const [isBannerLoading, setIsBannerLoading] = useState(false);
   const [bannerError, setBannerError] = useState("");
   const [bannerSearch, setBannerSearch] = useState("");
-  const [skinData, setSkinData] = useState<UpcomingSkin[]>([]);
   const [cnPredictedSkins, setCnPredictedSkins] = useState<UpcomingSkin[]>([]);
   const [isSkinLoading, setIsSkinLoading] = useState(false);
   const [skinError, setSkinError] = useState("");
-  const [showReleasedSkins, setShowReleasedSkins] = useState(false);
   const [skinSearch, setSkinSearch] = useState("");
-  const [skinPage, setSkinPage] = useState(1);
   const tierListNameIssue = tierListName.trim()
     ? findTierListNameIssue(tierListName)
     : "";
@@ -2751,18 +2748,14 @@ export function GameUserPage({
         normalizeSearchText(value).includes(keyword),
       );
     });
-  const filteredSkins = [...skinData, ...cnPredictedSkins]
+  const filteredSkins = cnPredictedSkins
     .filter((skin) => {
-      if (showReleasedSkins) return true;
-
       const today = new Date();
       const todayStart = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
 
-      if (skin.durationStart > 0 && skin.durationStart >= todayStart) return true;
-      if (skin.durationEnd > 0 && skin.durationEnd >= todayStart) return true;
-      if (skin.durationStart === 0) return true;
+      if (skin.durationEnd > 0 && skin.durationEnd < todayStart) return false;
 
-      return false;
+      return true;
     })
     .filter((skin) => {
       const keyword = normalizeSearchText(skinSearch);
@@ -2896,15 +2889,7 @@ export function GameUserPage({
     (operatorPage - 1) * OPERATORS_PER_PAGE,
     operatorPage * OPERATORS_PER_PAGE,
   );
-  const SKINS_PER_PAGE = 6;
-  const skinTotalPages = Math.max(
-    1,
-    Math.ceil(filteredSkins.length / SKINS_PER_PAGE),
-  );
-  const paginatedSkins = filteredSkins.slice(
-    (skinPage - 1) * SKINS_PER_PAGE,
-    skinPage * SKINS_PER_PAGE,
-  );
+
 
   const readJsonResponse = async (res: Response) => {
     const raw = await res.text();
@@ -3024,17 +3009,14 @@ export function GameUserPage({
           setSkinError(
             result?.message || "Không thể tải danh sách skin sắp ra mắt.",
           );
-          setSkinData([]);
           setCnPredictedSkins([]);
           return;
         }
 
-        setSkinData(Array.isArray(result.data) ? result.data : []);
         setCnPredictedSkins(Array.isArray(result.cnPredicted) ? result.cnPredicted : []);
       } catch (error) {
         console.error("Failed to fetch upcoming skins", error);
         setSkinError("Không thể tải danh sách skin sắp ra mắt.");
-        setSkinData([]);
         setCnPredictedSkins([]);
       } finally {
         setIsSkinLoading(false);
@@ -3047,10 +3029,6 @@ export function GameUserPage({
   useEffect(() => {
     setOperatorPage(1);
   }, [operatorSearch, operatorStarFilter]);
-
-  useEffect(() => {
-    setSkinPage(1);
-  }, [skinSearch, showReleasedSkins]);
 
   useEffect(() => {
     setTierPoolPage(1);
@@ -3067,12 +3045,6 @@ export function GameUserPage({
       setTierPoolPage(tierPoolTotalPages);
     }
   }, [tierPoolPage, tierPoolTotalPages]);
-
-  useEffect(() => {
-    if (skinPage > skinTotalPages) {
-      setSkinPage(skinTotalPages);
-    }
-  }, [skinPage, skinTotalPages]);
 
   useEffect(() => {
     if (userInfo) {
@@ -3962,14 +3934,8 @@ export function GameUserPage({
               <SkinsTabContent
                 filteredSkins={filteredSkins}
                 isSkinLoading={isSkinLoading}
-                paginatedSkins={paginatedSkins}
-                showReleasedSkins={showReleasedSkins}
-                setShowReleasedSkins={setShowReleasedSkins}
                 skinError={skinError}
-                skinPage={skinPage}
                 skinSearch={skinSearch}
-                skinTotalPages={skinTotalPages}
-                setSkinPage={setSkinPage}
                 setSkinSearch={setSkinSearch}
               />
 

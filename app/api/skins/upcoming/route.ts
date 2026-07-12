@@ -3,9 +3,6 @@ import { NextResponse } from "next/server";
 const WIKI_PARSE_API = (page: string) =>
   `https://arknights.wiki.gg/api.php?action=parse&page=${encodeURIComponent(page)}&prop=text&formatversion=2&format=json`;
 
-const YOSTAR_NEWS_API = (index: number, size: number) =>
-  `https://account.yo-star.com/api/game/news?key=ark&index=${index}&size=${size}`;
-
 const GH_SKIN_TABLE_CN =
   "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/skin_table.json";
 const GH_SKIN_TABLE_GLOBAL =
@@ -42,26 +39,6 @@ const CN_BRAND_MAP: Record<string, string> = {
   "玛尔特": "MARTHE",
   "巫异盛宴": "Witch Feast",
   "坎贝拉系列": "Cambrian Series",
-};
-
-type NewsRow = {
-  content: string;
-  id: number | string;
-  link: string;
-  publishTime: number | string;
-  title: string;
-};
-
-type UpcomingSkin = {
-  brand: string;
-  category: "new" | "re-edition";
-  durationEnd: number;
-  durationStart: number;
-  id: string;
-  imageUrl: string | null;
-  operator: string;
-  price: number | null;
-  skinName: string;
 };
 
 const decodeHtmlEntities = (value: string) =>
@@ -102,113 +79,6 @@ const normalizeId = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-
-const fetchNewsPage = async (index: number, size: number) => {
-  const response = await fetch(YOSTAR_NEWS_API(index, size), {
-    headers: {
-      Accept: "application/json",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    },
-    next: { revalidate: 3600 },
-  });
-
-  if (!response.ok) return [] as NewsRow[];
-
-  const payload = (await response.json()) as {
-    code?: number;
-    data?: { rows?: NewsRow[] };
-  };
-
-  if (payload.code !== 0 || !Array.isArray(payload.data?.rows)) return [];
-
-  return payload.data.rows;
-};
-
-const SKIN_LINE_REGEX =
-  /([A-Za-z0-9 ]+?)\s+(Collection|Series)\s*[-–—]\s*(.+?)\s+for\s+([A-Za-z][A-Za-z \-']+?)(?:\s*\(|<|\s*$)/i;
-
-const isInvalidSkinText = (value: string) =>
-  /,|\band\b|including|etc\.?|more|Furniture|Materials|LMD|Battle\s*Records/i.test(value);
-
-const SECTION_HEADER_REGEX = /<h2[^>]*>[\s\S]*?<\/h2>/gi;
-
-const CATEGORY_BRAND_REGEX =
-  /(?:EPOQUE|Coral Coast|MARTHE|Witch Feast|Cambrian Series|Icefield Messenger|Vitafield|Pioneer|Striker|Bloodline of Combat|Rhodes Kitchen|Dreambind Castle|Whistlewind|Ambience Synesthesia|Shining Steps|CROSSOVER|Made by 0011|0011 Tempest|0011 Yun|Test Collection)\s+Collection/i;
-
-const DURATION_REGEX =
-  /DURATION:\s*([^<]+?)\s*[-–—]\s*([^<]+?)\s*\(/i;
-
-const parseDate = (dateStr: string) => {
-  const cleaned = stripHtml(dateStr);
-  const d = new Date(cleaned);
-  return Number.isFinite(d.getTime()) ? d.getTime() : 0;
-};
-
-const parseOutfitSections = (html: string) => {
-  const sections: Array<{
-    brand: string;
-    category: "new" | "re-edition";
-    durationStart: number;
-    durationEnd: number;
-    skinName: string;
-    operator: string;
-  }> = [];
-
-  const sectionBlocks = html.split(SECTION_HEADER_REGEX);
-
-  for (const block of sectionBlocks) {
-    const isReEdition = /Re-edition\s+Outfit/i.test(block);
-    const isNewArrival =
-      !isReEdition &&
-      (/NEW\s+ARRIVAL/i.test(block) ||
-        /new\s+Outfit/i.test(block) ||
-        /Outfit\s+will be available/i.test(block));
-
-    if (!isNewArrival && !isReEdition) continue;
-
-    const category: "new" | "re-edition" = isNewArrival ? "new" : "re-edition";
-    const cleanBlock = stripHtml(block);
-
-    const durationMatch = cleanBlock.match(DURATION_REGEX);
-    if (!durationMatch) continue;
-
-    const durationStart = parseDate(durationMatch[1]);
-    const durationEnd = parseDate(durationMatch[2]);
-
-    const brandMatch = cleanBlock.match(CATEGORY_BRAND_REGEX);
-    const brand = brandMatch
-      ? brandMatch[0].replace(/\s+Collection/i, "")
-      : "Unknown";
-
-    const divLines = block.split(/<div[^>]*>/gi);
-    for (const line of divLines) {
-      const cleanLine = stripHtml(line);
-      const skinMatch = cleanLine.match(SKIN_LINE_REGEX);
-      if (!skinMatch) continue;
-
-      const brandPrefix = stripHtml(skinMatch[1]).trim();
-      const brandSuffix = stripHtml(skinMatch[2]).trim();
-      const lineBrand = brandSuffix === "Series" ? `${brandPrefix} ${brandSuffix}` : brandPrefix;
-      const skinName = stripHtml(skinMatch[3]).trim();
-      const operator = stripHtml(skinMatch[4]).trim();
-
-      if (!skinName || !operator) continue;
-      if (isInvalidSkinText(skinName) || isInvalidSkinText(operator)) continue;
-
-      sections.push({
-        brand: /crossover/i.test(lineBrand) ? brand : lineBrand,
-        category,
-        durationStart,
-        durationEnd,
-        skinName,
-        operator,
-      });
-    }
-  }
-
-  return sections;
-};
 
 const fetchWikiMarkup = async (page: string) => {
   const response = await fetch(WIKI_PARSE_API(page), {
@@ -254,17 +124,6 @@ const extractPrice = (html: string) => {
     /(\d+)\s*(?:&#32;)?\s*<a[\s\S]*?title="Originite Prime"/i,
   );
   return opMatch ? Number(opMatch[1]) : null;
-};
-
-const extractLabeledValue = (html: string, label: string) => {
-  const pattern = new RegExp(
-    `<div><b>${label}(?:&#58;|:)</b>[\\s\\S]*?<\\/div>`,
-    "i",
-  );
-  const match = html.match(pattern);
-  return match
-    ? stripHtml(match[0]).replace(new RegExp(`^${label}:?\\s*`, "i"), "")
-    : "";
 };
 
 const parseSkinRows = (html: string, brand: string, sourcePage: string) => {
@@ -395,98 +254,29 @@ export async function GET(request: Request) {
     const cnPage = Math.max(1, Number(searchParams.get("cnPage")) || 1);
     const cnPerPage = Math.max(1, Math.min(100, Number(searchParams.get("cnPerPage")) || 9));
 
-    const newsRows: NewsRow[] = [];
-    for (let page = 1; page <= 10; page += 1) {
-      const rows = await fetchNewsPage(page, 5);
-      newsRows.push(...rows);
-    }
-
-    const upcomingSkins: UpcomingSkin[] = [];
-    const seen = new Map<string, number>();
-    const now = Date.now();
-
-    for (const news of newsRows) {
-      const title = news.title ?? "";
-      const content = news.content ?? "";
-      if (!/OUTFIT/i.test(title) && !/OUTFIT/i.test(content)) continue;
-
-      const sections = parseOutfitSections(content);
-      for (const section of sections) {
-        if (!section.durationEnd || section.durationEnd < now) continue;
-
-        const id = `${normalizeId(section.operator)}-${normalizeId(section.skinName)}`;
-        const existing = seen.get(id);
-        if (existing && existing <= section.durationStart) continue;
-        seen.set(id, section.durationStart);
-
-        upcomingSkins.push({
-          brand: section.brand,
-          category: section.category,
-          durationEnd: section.durationEnd,
-          durationStart: section.durationStart,
-          id,
-          imageUrl: null,
-          operator: section.operator,
-          price: null,
-          skinName: section.skinName,
-        });
-      }
-    }
-
-    if (upcomingSkins.length > 0) {
-      const outfitHtml = await fetchWikiMarkup("Outfit");
-      if (outfitHtml) {
-        const brandPages = extractBrandPages(outfitHtml);
-        const wikiSkinMap = new Map<string, { imageUrl: string; price: number | null }>();
-
-        for (const brand of brandPages) {
-          const brandHtml = await fetchWikiMarkup(brand.page);
-          if (!brandHtml) continue;
-          const brandSkins = parseSkinRows(brandHtml, brand.name, brand.page);
-          for (const skin of brandSkins) {
-            if (skin.imageUrl) {
-              const entry = { imageUrl: skin.imageUrl, price: skin.price };
-              wikiSkinMap.set(skin.id, entry);
-              wikiSkinMap.set(
-                `${normalizeId(skin.operator)}-${normalizeId(skin.skinName.replace(/\s*\(.*?\)\s*/g, "").trim())}`,
-                entry,
-              );
-            }
-          }
-        }
-
-        for (const skin of upcomingSkins) {
-          const match = wikiSkinMap.get(skin.id);
-          if (match) {
-            skin.imageUrl = match.imageUrl;
-            skin.price = match.price;
-          }
-        }
-      }
-    }
-
-    upcomingSkins.sort((a, b) => a.durationStart - b.durationStart);
-
     const [charMap, cnSkins] = await Promise.all([
       fetchCharacterMap(),
       fetchCnOnlySkins(),
     ]);
 
-    let anchorLagMs = 180 * 24 * 60 * 60 * 1000;
-    const upcomingMap = new Map<string, number>();
-    for (const upcoming of upcomingSkins) {
-      const key = normalizeId(upcoming.operator);
-      if (key && !upcomingMap.has(key)) upcomingMap.set(key, upcoming.durationStart);
-    }
-
-    for (const cnSkin of cnSkins) {
-      if (cnSkin.getTime <= 0) continue;
-      const cnOperator = charMap.get(cnSkin.charId);
-      const cnKey = cnOperator ? normalizeId(cnOperator) : normalizeId(cnSkin.charId.replace(/^char_\d+_/, "").replace(/_/g, " "));
-      const globalStart = cnKey ? upcomingMap.get(cnKey) : undefined;
-      if (globalStart) {
-        anchorLagMs = globalStart - cnSkin.getTime * 1000;
-        break;
+    const wikiSkinMap = new Map<string, { imageUrl: string; price: number | null }>();
+    const outfitHtml = await fetchWikiMarkup("Outfit");
+    if (outfitHtml) {
+      const brandPages = extractBrandPages(outfitHtml);
+      for (const brand of brandPages) {
+        const brandHtml = await fetchWikiMarkup(brand.page);
+        if (!brandHtml) continue;
+        const brandSkins = parseSkinRows(brandHtml, brand.name, brand.page);
+        for (const skin of brandSkins) {
+          if (skin.imageUrl) {
+            const entry = { imageUrl: skin.imageUrl, price: skin.price };
+            wikiSkinMap.set(skin.id, entry);
+            wikiSkinMap.set(
+              `${normalizeId(skin.operator)}-${normalizeId(skin.skinName.replace(/\s*\(.*?\)\s*/g, "").trim())}`,
+              entry,
+            );
+          }
+        }
       }
     }
 
@@ -497,8 +287,10 @@ export async function GET(request: Request) {
       const id = `${normalizeId(operator)}-${cleanName}`;
       const brand = mapCnBrand(skin.brand);
       const cnRelease = skin.getTime > 0 ? skin.getTime * 1000 : Date.now();
-      const estimatedStart = cnRelease + anchorLagMs;
-      const estimatedEnd = estimatedStart + 21 * 24 * 60 * 60 * 1000;
+      const estimatedEnd = cnRelease + 192 * 24 * 60 * 60 * 1000;
+      const duration = 21 * 24 * 60 * 60 * 1000;
+      const estimatedStart = estimatedEnd - duration;
+      const wikiMatch = wikiSkinMap.get(id) ?? wikiSkinMap.get(`${normalizeId(operator)}-${normalizeId(skin.skinName.replace(/\s*\(.*?\)\s*/g, "").trim())}`);
 
       return {
         brand,
@@ -506,19 +298,21 @@ export async function GET(request: Request) {
         durationEnd: estimatedEnd,
         durationStart: estimatedStart,
         id,
-        imageUrl: skin.portraitId
+        imageUrl: wikiMatch?.imageUrl ?? (skin.portraitId
           ? `https://raw.githubusercontent.com/PuppiizSunniiz/Arknight-Images/main/characters/${skin.portraitId.replace(/#/g, "%23")}.png`
-          : null,
+          : null),
         fallbackImageUrl: hasWikiIcon
           ? `https://arknights.wiki.gg/images/${operator.replace(/ /g, "_")}_icon.png`
           : null,
         operator,
-        price: null as number | null,
+        price: wikiMatch?.price ?? null,
         skinName: skin.skinName,
         sortId: skin.sortId,
         source: "cn" as const,
       };
     });
+
+    cnPredicted.sort((a, b) => a.durationStart - b.durationStart);
 
     const cnTotal = cnPredicted.length;
     const cnPageStart = (cnPage - 1) * cnPerPage;
@@ -526,13 +320,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
-        count: upcomingSkins.length,
-        data: upcomingSkins,
+        count: cnPredicted.length,
+        data: [],
         cnPredicted: cnPageData,
         cnPage,
         cnPerPage,
         cnTotal,
-        source: "https://account.yo-star.com",
       },
       {
         headers: {

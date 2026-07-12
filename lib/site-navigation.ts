@@ -43,9 +43,9 @@ export const getMainTabPath = (tab: MainTab, toolTab: ToolTab = "pull-planner") 
 export const HEADER_NAV_ITEMS = [
   { href: "/", label: "Trang chủ", icon: "home", tone: "slate" },
   { href: "/banners", label: "Banners", icon: "gallery", tone: "sky" },
+  { href: "/skins", label: "Skins", icon: "shirt", tone: "purple" },
   { href: "/tools/pull-planner", label: "Pull Planner", icon: "diamond", tone: "amber" },
   { href: "/tools/recruitment-calculator", label: "Recruitment", icon: "users", tone: "rose" },
-  { href: "/skins", label: "Skins", icon: "shirt", tone: "purple" },
   { href: "/characters", label: "Characters", icon: "users", tone: "emerald" },
   { href: "/tier-list", label: "Tier List", icon: "trophy", tone: "amber" },
   { href: "/news", label: "Tin tức", icon: "scroll", tone: "cyan" },

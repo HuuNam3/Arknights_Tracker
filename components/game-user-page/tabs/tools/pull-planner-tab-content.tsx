@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle, Diamond } from "lucide-react";
+import React, { useState, useCallback } from "react";
+import { AlertCircle, ChevronDown, ChevronUp, Diamond, Undo2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -190,6 +191,16 @@ export function PullPlannerTabContent({
   pullPlannerTargets,
   selectedPullPlannerTarget,
 }: PullPlannerTabContentProps) {
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const [spentPulls, setSpentPulls] = useState(0);
+  const [timelineView, setTimelineView] = useState<"weekly" | "daily">("weekly");
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    resources: false,
+    income: false,
+    timeline: false,
+  });
+  const toggleSection = (key: string) =>
+    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   const parsedWeeklyRegularOrundum = Number.parseInt(
     pullPlanner.weeklyRegularOrundum,
     10,
@@ -547,8 +558,134 @@ export function PullPlannerTabContent({
   const weeklypullTimelineTotalPulls = Math.floor(weeklypullTimelineTotalOrundum / 600);
   const weeklypullTimelineLeftoverOrundum = weeklypullTimelineTotalOrundum % 600;
 
+  const dailyTimeline: Array<{
+    date: Date;
+    dayLabel: string;
+    offset: number;
+    totalPulls: number;
+    isToday: boolean;
+    isWeekend: boolean;
+    events: string[];
+  }> = [];
+  if (plannerDaysUntilBanner > 0) {
+    for (let i = 0; i <= plannerDaysUntilBanner; i++) {
+      const date = new Date(plannerToday);
+      date.setDate(plannerToday.getDate() + i);
+      const dayOfWeek = date.getDay();
+      const isMonday = dayOfWeek === 1;
+      let orundum = 0;
+      let permits = 0;
+      const events: string[] = [];
+
+      if (pullPlanner.dailyMissionEnabled) {
+        orundum += 100;
+      }
+      if (pullPlanner.monthlyCardEnabled) {
+        orundum += 200;
+      }
+      if (isMonday) {
+        if (pullPlanner.weeklyMissionEnabled) {
+          orundum += 500;
+          events.push("Weekly mission");
+        }
+        orundum += normalizedWeeklyRegularOrundum;
+        events.push("Annihilation");
+      }
+      if (
+        pullPlanner.monthlySignInEnabled &&
+        date.getDate() === DAILY_SIGNIN_PERMIT_DAY
+      ) {
+        permits += 1;
+        events.push("Sign-in permit");
+      }
+
+      commendationShopMonthOffsets.forEach((offset, index) => {
+        if (offset === i) {
+          const b = plannerCommendationShopBreakdown[index];
+          if (b && b.spent > 0) {
+            orundum += b.orundum;
+            permits += b.permits;
+            events.push("Commendation");
+          }
+        }
+      });
+      distinctionShopMonthOffsets.forEach((offset, index) => {
+        if (offset === i) {
+          const b = plannerDistinctionShopBreakdown[index];
+          if (b && b.spent > 0) {
+            permits += b.permits;
+            events.push("Distinction");
+          }
+        }
+      });
+      monthlySignInOffsets.forEach((offset) => {
+        if (offset === i) {
+          permits += 1;
+          if (!events.includes("Sign-in permit")) events.push("Sign-in permit");
+        }
+      });
+      plannerEventRewardEntries.forEach(({ bannerName, date, bonus }) => {
+        const offset = getDateOffset(date);
+        if (offset === i) {
+          orundum += bonus.transferableOrundum;
+          permits += bonus.transferablePermits;
+          events.push(`Event: ${bannerName}`);
+        }
+      });
+      plannerEventShopEntries.forEach(({ bannerName, date, pulls }) => {
+        const offset = getDateOffset(date);
+        if (offset === i) {
+          permits += pulls;
+          events.push(`Shop: ${bannerName}`);
+        }
+      });
+
+      const totalPulls = orundum / 600 + permits;
+      dailyTimeline.push({
+        date,
+        dayLabel: WEEKDAY_LABELS[dayOfWeek],
+        offset: i,
+        totalPulls: Math.round(totalPulls * 100) / 100,
+        isToday: i === 0,
+        isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+        events,
+      });
+    }
+  }
+
   return (
     <TabsContent value="pull-planner" className="mt-0 focus-visible:outline-none">
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; max-height: 0; }
+          to { opacity: 1; max-height: 2000px; }
+        }
+        @keyframes slideUp {
+          from { opacity: 1; max-height: 2000px; }
+          to { opacity: 0; max-height: 0; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
+          50% { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
+        }
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out forwards;
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.25s ease-out forwards;
+        }
+        .animate-pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+        .section-collapsible {
+          overflow: hidden;
+          transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+        }
+      `}</style>
       <div className="space-y-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -614,40 +751,77 @@ export function PullPlannerTabContent({
           </div>
         )}
 
-        <div className="grid gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-700">Mục tiêu pull</label>
-            <Input
-              type="number"
-              min={0}
-              value={pullPlanner.targetPulls ?? ""}
-              onChange={(e) => handlePullPlannerChange("targetPulls", e.target.value)}
-              placeholder="Ví dụ: 300"
-              className="h-12 rounded-xl border-emerald-200 bg-white focus-visible:ring-emerald-200"
-            />
+            <div className="relative">
+              <Input
+                type="number"
+                min={0}
+                value={pullPlanner.targetPulls ?? ""}
+                onChange={(e) => handlePullPlannerChange("targetPulls", e.target.value)}
+                placeholder="Ví dụ: 300"
+                className="h-12 rounded-xl border-emerald-200 bg-white pr-14 focus-visible:ring-emerald-200"
+              />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-emerald-600">
+                pull
+              </span>
+            </div>
           </div>
-          <div className="rounded-lg border border-white bg-white/80 px-4 py-3 text-sm">
-            <p className="font-semibold text-slate-800">
-              {!hasPlannerTargetPullGoal
-                ? "Nhập mục tiêu pull để so sánh"
-                : plannerTargetPullGap >= 0
-                  ? `Đủ mục tiêu, dư ${plannerTargetPullGap} pull`
-                  : `Còn thiếu ${Math.abs(plannerTargetPullGap)} pull`}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {hasPlannerTargetPullGoal
-                ? `Dự kiến ${plannerProjectedBannerPulls} / mục tiêu ${plannerTargetPullGoal} pull.`
-                : `Dự kiến hiện tại: ${plannerProjectedBannerPulls} pull.`}
-            </p>
+          <div className="space-y-2">
+            <div className="rounded-lg border border-white bg-white/80 px-4 py-3 text-sm">
+              <p className="font-semibold text-slate-800">
+                {!hasPlannerTargetPullGoal
+                  ? "Nhập mục tiêu pull để so sánh"
+                  : plannerTargetPullGap >= 0
+                    ? `Đủ mục tiêu, dư ${plannerTargetPullGap} pull`
+                    : `Còn thiếu ${Math.abs(plannerTargetPullGap)} pull`}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {hasPlannerTargetPullGoal
+                  ? `Dự kiến ${plannerProjectedBannerPulls} / mục tiêu ${plannerTargetPullGoal} pull.`
+                  : `Dự kiến hiện tại: ${plannerProjectedBannerPulls} pull.`}
+              </p>
+            </div>
           </div>
+        </div>
+            {hasPlannerTargetPullGoal && (
+              <div className="mt-3 space-y-1">
+                <div className="flex h-3 overflow-hidden rounded-full bg-white/80">
+                  <div
+                    className={`rounded-full transition-all duration-500 ${
+                      plannerTargetPullGap >= 0
+                        ? "bg-emerald-400"
+                        : "bg-amber-400"
+                    }`}
+                    style={{
+                      width: `${Math.min(100, (plannerProjectedBannerPulls / plannerTargetPullGoal) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-right text-[11px] text-slate-500">
+                  {Math.min(100, Math.round((plannerProjectedBannerPulls / plannerTargetPullGoal) * 100))}%
+                </p>
+              </div>
+            )}
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm text-slate-600">
-            Nhập tài nguyên hiện có của bạn, gồm cả cert, để quy đổi pull hiện tại và
-            tính phần shop trước banner.
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+          <button
+            type="button"
+            onClick={() => toggleSection("resources")}
+          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-100 hover:shadow-sm"
+        >
+          <span className="flex items-center gap-2">
+            <span className={`inline-block transition-transform duration-300 ${collapsedSections.resources ? "" : "rotate-90"}`}>📦</span>
+            Tài nguyên hiện có
+          </span>
+          <span className={`text-slate-400 transition-transform duration-300 ${collapsedSections.resources ? "" : "rotate-180"}`}>{collapsedSections.resources ? "+" : "−"}</span>
+          </button>
+          {collapsedSections.resources ? null : (
+            <div className="animate-slideDown"><React.Fragment>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {plannerResourceInputs.map(
               ({ field, label, icon, cardClassName, inputClassName }) => (
               <div
@@ -676,8 +850,10 @@ export function PullPlannerTabContent({
               </div>
               ),
             )}
+          </div>
 
-            <div className="space-y-2 rounded-2xl border border-lime-200 bg-lime-50 p-3 shadow-sm">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <img
                   src={TOOL_ICON_URLS.commendationCertificate}
@@ -695,9 +871,9 @@ export function PullPlannerTabContent({
                 value={pullPlanner.commendations}
                 onChange={(e) => handlePullPlannerChange("commendations", e.target.value)}
                 placeholder="Commendations"
-                className="rounded-xl border-lime-200 bg-white focus-visible:ring-lime-200"
+                className="rounded-xl border-emerald-200 bg-white focus-visible:ring-emerald-200"
               />
-              <div className="grid grid-cols-3 gap-1">
+              <div className="grid grid-cols-3 gap-1.5">
                 {([
                   ["phase1", "P1"],
                   ["phase2", "P2"],
@@ -707,10 +883,10 @@ export function PullPlannerTabContent({
                     key={mode}
                     type="button"
                     onClick={() => handlePullPlannerChange("commendationShopMode", mode)}
-                    className={`rounded-lg border px-2 py-1 text-[10px] font-semibold transition-colors ${
+                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                       pullPlanner.commendationShopMode === mode
-                        ? "border-lime-300 bg-lime-100 text-lime-700"
-                        : "border-lime-200 bg-white text-slate-500 hover:border-lime-300"
+                        ? "border-emerald-300 bg-emerald-100 text-emerald-700"
+                        : "border-emerald-200 bg-white text-slate-500 hover:border-emerald-300"
                     }`}
                   >
                     {label}
@@ -726,7 +902,7 @@ export function PullPlannerTabContent({
               </p>
             </div>
 
-            <div className="space-y-2 rounded-2xl border border-yellow-200 bg-yellow-50 p-3 shadow-sm">
+            <div className="space-y-2 rounded-2xl border border-cyan-200 bg-cyan-50 p-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <img
                   src={TOOL_ICON_URLS.distinctionCertificate}
@@ -744,11 +920,11 @@ export function PullPlannerTabContent({
                 value={pullPlanner.distinctions}
                 onChange={(e) => handlePullPlannerChange("distinctions", e.target.value)}
                 placeholder="Distinctions"
-                className="rounded-xl border-yellow-200 bg-white focus-visible:ring-yellow-200"
+                className="rounded-xl border-cyan-200 bg-white focus-visible:ring-cyan-200"
               />
             </div>
 
-            <div className="space-y-2 rounded-2xl border border-pink-200 bg-pink-50 p-3 shadow-sm">
+            <div className="space-y-2 rounded-2xl border border-teal-200 bg-teal-50 p-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <img
                   src={TOOL_ICON_URLS.intelligenceCertificate}
@@ -768,11 +944,11 @@ export function PullPlannerTabContent({
                   handlePullPlannerChange("intelligenceCertificates", e.target.value)
                 }
                 placeholder="Intelligence Certificate"
-                className="rounded-xl border-pink-200 bg-white focus-visible:ring-pink-200"
+                className="rounded-xl border-teal-200 bg-white focus-visible:ring-teal-200"
               />
             </div>
 
-            <div className="space-y-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 shadow-sm">
+            <div className="space-y-2 rounded-2xl border border-cyan-200 bg-cyan-50 p-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <img
@@ -785,7 +961,7 @@ export function PullPlannerTabContent({
                   />
                   <p className="text-sm font-semibold text-slate-800">Annihilation mỗi tuần</p>
                 </div>
-                <Badge variant="outline" className="border-sky-200 bg-white text-sky-700">
+                <Badge variant="outline" className="border-cyan-200 bg-white text-cyan-700">
                   {normalizedWeeklyRegularOrundum}
                 </Badge>
               </div>
@@ -797,7 +973,7 @@ export function PullPlannerTabContent({
                 onValueChange={([value]) =>
                   handlePullPlannerChange("weeklyRegularOrundum", `${value}`)
                 }
-                className="py-2 bg-cyan-300"
+                className="py-2"
               />
               <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <span>{MIN_WEEKLY_ANNIHILATION_ORUNDUM}</span>
@@ -805,9 +981,21 @@ export function PullPlannerTabContent({
               </div>
               </div>
           </div>
-        </div>
+            </React.Fragment></div>)}</div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <button
+          type="button"
+          onClick={() => toggleSection("income")}
+          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-100 hover:shadow-sm"
+        >
+          <span className="flex items-center gap-2">
+            <span className={`inline-block transition-transform duration-300 ${collapsedSections.income ? "" : "rotate-90"}`}>📅</span>
+            Nguồn thu nhập
+          </span>
+          <span className={`text-slate-400 transition-transform duration-300 ${collapsedSections.income ? "" : "rotate-180"}`}>{collapsedSections.income ? "+" : "−"}</span>
+        </button>
+        {collapsedSections.income ? null : (
+        <div className="animate-slideDown grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {[
             [
               "dailyMissionEnabled",
@@ -848,10 +1036,10 @@ export function PullPlannerTabContent({
           ].map(([field, title, subtitle, detail]) => (
             <label
               key={field}
-              className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
+              className={`flex items-center gap-3 rounded-xl border p-4 transition-all duration-300 hover:shadow-sm ${
                 pullPlanner[field]
                   ? "border-emerald-200 bg-emerald-50"
-                  : "border-slate-100 bg-white"
+                  : "border-slate-100 bg-white hover:border-slate-200"
               }`}
             >
               <input
@@ -949,18 +1137,57 @@ export function PullPlannerTabContent({
             </div>
           </label>
         </div>
+        )}
 
-        <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 p-4 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => toggleSection("timeline")}
+          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-100 hover:shadow-sm"
+        >
+          <span className="flex items-center gap-2">
+            <span className={`inline-block transition-transform duration-300 ${collapsedSections.timeline ? "" : "rotate-90"}`}>📊</span>
+            Dòng thời gian tích pull
+          </span>
+          <span className={`text-slate-400 transition-transform duration-300 ${collapsedSections.timeline ? "" : "rotate-180"}`}>{collapsedSections.timeline ? "+" : "−"}</span>
+        </button>
+        {collapsedSections.timeline ? null : (
+        <div className="animate-slideDown rounded-xl border border-cyan-100 bg-cyan-50/60 p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-800">Các tuần tích pull đều đặn</p>
               <p className="mt-1 text-xs text-slate-500">
                 Liệt kê từng tuần từ hôm nay tới banner; shop, permit sự kiện và quà không đều sẽ nằm ở bảng bên dưới.
               </p>
             </div>
+            <div className="flex rounded-lg border border-cyan-200 bg-white p-0.5">
+              <button
+                type="button"
+                onClick={() => setTimelineView("weekly")}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  timelineView === "weekly"
+                    ? "bg-cyan-100 text-cyan-700"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Theo tuần
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimelineView("daily")}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  timelineView === "daily"
+                    ? "bg-cyan-100 text-cyan-700"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Theo ngày
+              </button>
+            </div>
           </div>
-          <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
-            {weeklypullTimeline.length > 0 ? (
+           <div className="mt-3 pr-1">
+            {timelineView === "weekly" && (
+              <div className="space-y-2">
+              {weeklypullTimeline.length > 0 ? (
               weeklypullTimeline.map((week) => {
                 const weeklyTotalOrundum =
                   week.orundum + (week.permits + week.targetOnlyPulls) * 600;
@@ -1001,8 +1228,78 @@ export function PullPlannerTabContent({
                 Banner đã quá gần hoặc chưa có ngày để chia tuần tích pull.
               </p>
             )}
+            </div>
+            )}
+            {timelineView === "daily" && dailyTimeline.length > 0 && (
+            <div className="max-h-96 overflow-y-auto">
+              <div className="grid grid-cols-[4rem_repeat(7,1fr)] gap-px overflow-hidden rounded-lg border border-cyan-200 bg-white text-xs">
+                <div className="bg-cyan-100 p-2 font-semibold text-cyan-800">Tuần</div>
+                {WEEKDAY_LABELS.map((d) => (
+                  <div key={d} className="bg-cyan-100 p-2 text-center font-semibold text-cyan-800">
+                    {d}
+                  </div>
+                ))}
+                {(() => {
+                  const weeks: { days: typeof dailyTimeline }[] = [];
+                  let currentWeek: typeof dailyTimeline = [];
+                  dailyTimeline.forEach((day) => {
+                    if (day.offset > 0 && day.date.getDay() === 1 && currentWeek.length > 0) {
+                      weeks.push({ days: currentWeek });
+                      currentWeek = [];
+                    }
+                    currentWeek.push(day);
+                  });
+                  if (currentWeek.length > 0) weeks.push({ days: currentWeek });
+                  return weeks.map((week, wi) => (
+                    <React.Fragment key={wi}>
+                      <div className="flex items-center justify-center bg-cyan-50 p-2 font-medium text-cyan-700">
+                        {wi + 1}
+                      </div>
+                      {(() => {
+                        const cells: React.ReactNode[] = [];
+                        const firstDay = week.days[0].date.getDay();
+                        const startPad = firstDay === 0 ? 6 : firstDay - 1;
+                        for (let p = 0; p < startPad; p++) {
+                          cells.push(<div key={`pad-${wi}-${p}`} className="bg-slate-50" />);
+                        }
+                        week.days.forEach((day, di) => {
+                          const cellPulls = Math.floor(day.totalPulls);
+                          const colorClass =
+                            cellPulls >= 5
+                              ? "bg-emerald-100 text-emerald-800"
+                              : cellPulls >= 2
+                                ? "bg-amber-50 text-amber-700"
+                                : cellPulls > 0
+                                  ? "bg-slate-100 text-slate-600"
+                                  : "text-slate-400";
+                          cells.push(
+                            <div
+                              key={di}
+                              className={`flex flex-col items-center justify-center p-1.5 ${colorClass} ${day.isToday ? "ring-2 ring-inset ring-cyan-400" : ""}`}
+                            >
+                              <span className="text-[10px] font-bold">{day.date.getDate()}</span>
+                              <span className="text-[9px] font-semibold">{cellPulls}</span>
+                            </div>,
+                          );
+                        });
+                        const endPad = 7 - (startPad + week.days.length);
+                        for (let p = 0; p < endPad; p++) {
+                          cells.push(<div key={`pad-end-${wi}-${p}`} className="bg-slate-50" />);
+                        }
+                        return cells;
+                      })()}
+                    </React.Fragment>
+                  ));
+                })()}
+              </div>
+              <p className="mt-2 text-[11px] text-slate-400">
+                Mỗi ô hiển thị ngày và số pull tích được. Ô khoanh viền là hôm nay.
+              </p>
+            </div>
+            )}
           </div>
         </div>
+        )}
 
         {(plannerEventRewardEntries.length > 0 || plannerEventShopEntries.length > 0) && (
           <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
@@ -1064,76 +1361,88 @@ export function PullPlannerTabContent({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+        <div className="sticky top-4 z-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm transition-all duration-300 hover:shadow-md">
             <p className="text-xs font-semibold uppercase text-slate-500">Pull hiện có</p>
-            <p className="mt-1 text-2xl font-black text-slate-800">{plannerCurrentPulls}</p>
-            <div className="mt-2 space-y-1 text-xs text-slate-500">
-              <p>Orundum đang có: {plannerOrundum} = {Math.floor(plannerOrundum / 600)} pull.</p>
-              <p>Originite Prime: {plannerPrime} OP = {plannerPrime * 180} Orundum.</p>
-              <p>Headhunting Permit: {plannerPermits} permit = {plannerPermits} pull.</p>
-              <p>Originium Shard: {plannerShards} shard = {plannerShardOrundum} Orundum.</p>
-              <p>
-                Intelligence Certificate: {plannerIntelligenceCertificates} cert ={" "}
-                {plannerIntelligenceOrundum} Orundum.
-              </p>
-              <p className="font-semibold text-slate-700">
-                Tổng quy đổi: {plannerCurrentOrundum} Orundum + {plannerPermits} permit,
-                còn dư {plannerCurrentLeftoverOrundum} Orundum.
-              </p>
-            </div>
+            <p className="mt-2 text-5xl font-black text-slate-800 transition-all duration-300 hover:scale-110">{plannerCurrentPulls}</p>
           </div>
-          <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 shadow-sm">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-cyan-200 bg-cyan-50 p-6 shadow-sm transition-all duration-300 hover:shadow-md">
             <p className="text-xs font-semibold uppercase text-slate-500">
-              Pull tích được trong {weeklypullTimeline.length} tuần
+              Pull tích tuần ({weeklypullTimeline.length})
             </p>
-            <p className="mt-1 text-2xl font-black text-cyan-800">{weeklypullTimelineTotalPulls}</p>
-            <div className="mt-2 space-y-1 text-xs text-slate-500">
-              <p>
-                Lấy tổng từ các dòng <span className="font-semibold">Tổng tuần</span> trong bảng chi tiết phía trên.
-              </p>
-              <p>
-                Mỗi permit trong Commendation/Distinction/event được quy đổi thành 600 Orundum trước khi cộng.
-              </p>
-              <p>
-                Tổng tích theo tuần: {weeklypullTimelineTotalOrundum} Orundum ={" "}
-                {weeklypullTimelineTotalPulls} pull
-                {weeklypullTimelineLeftoverOrundum > 0
-                  ? ` + dư ${weeklypullTimelineLeftoverOrundum} Orundum`
-                  : ""}.
-              </p>
-              <p>Không cộng tài nguyên đang có sẵn trong kho của bạn.</p>
-            </div>
+            <p className="mt-2 text-5xl font-black text-cyan-800 transition-all duration-300 hover:scale-110">{weeklypullTimelineTotalPulls}</p>
           </div>
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase text-slate-500">Pull dự kiến khi đến banner</p>
-            <p className="mt-1 text-2xl font-black text-emerald-800">{plannerProjectedBannerPulls}</p>
-            <div className="mt-2 space-y-1 text-xs text-slate-500">
-              <p>Đây là số pull dự kiến dùng được khi banner bắt đầu.</p>
-              <p>
-                Gồm {plannerCurrentPulls} pull hiện có + phần tích lũy tới banner +{" "}
-                {plannerTargetOnlyPulls} pull khóa riêng trên banner target.
+          <div className="relative flex flex-col items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm transition-all duration-300 hover:shadow-md">
+            <p className="text-xs font-semibold uppercase text-slate-500">Dự kiến đến banner</p>
+            <button
+              type="button"
+              onClick={() => {
+                const amount = window.prompt("Nhập số pull muốn chi tiêu (mô phỏng):", "10");
+                if (amount !== null) {
+                  const num = Number.parseInt(amount, 10);
+                  if (!Number.isNaN(num) && num > 0) {
+                    setSpentPulls((prev) => Math.min(prev + num, plannerProjectedBannerPulls));
+                  }
+                }
+              }}
+              className="mt-2 text-5xl font-black text-emerald-800 transition-all duration-300 hover:scale-110 hover:cursor-pointer"
+              title="Click để mô phỏng chi tiêu pull"
+            >
+              {Math.max(0, plannerProjectedBannerPulls - spentPulls)}
+            </button>
+            {spentPulls > 0 && (
+              <button
+                type="button"
+                onClick={() => setSpentPulls(0)}
+                className="absolute right-2 top-2 rounded-full border border-emerald-200 bg-white p-1 text-emerald-600 transition-all duration-300 hover:bg-emerald-50 hover:shadow-sm"
+                title="Reset đã chi tiêu"
+              >
+                <Undo2 className="size-3.5" />
+              </button>
+            )}
+            {spentPulls > 0 && (
+              <p className="mt-1 text-[11px] text-emerald-600">
+                Đã chi {spentPulls} pull, còn {Math.max(0, plannerProjectedBannerPulls - spentPulls)}
               </p>
-              <p>
-                Pull tích lũy có thể bao gồm daily, weekly, Annihilation, monthly card, sign-in,
-                shop cert, event shop và quà sự kiện nếu bạn bật các mục đó.
-              </p>
-              <p className="font-semibold text-slate-700">
-                Sau quy đổi còn dư {plannerProjectedBannerLeftoverOrundum} Orundum.
-              </p>
-            </div>
+            )}
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="font-semibold text-slate-800">Gợi ý kiếm thêm Orundum</p>
           <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
-            {ORUNDUM_FARMING_SUGGESTIONS.map(({ title, description }) => (
-              <p key={title} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                <span className="font-semibold text-slate-800">{title}:</span> {description}
-              </p>
-            ))}
+            {(showAllSuggestions
+              ? ORUNDUM_FARMING_SUGGESTIONS
+              : ORUNDUM_FARMING_SUGGESTIONS.slice(0, 6)
+            ).map(({ title, description }, i) => {
+              const bgColors = [
+                "bg-rose-50 border-rose-100",
+                "bg-amber-50 border-amber-100",
+                "bg-emerald-50 border-emerald-100",
+                "bg-cyan-50 border-cyan-100",
+                "bg-violet-50 border-violet-100",
+                "bg-orange-50 border-orange-100",
+              ];
+              return (
+                <p key={title} className={`rounded-lg border p-3 ${bgColors[i % bgColors.length]}`}>
+                  <span className="font-semibold text-slate-800">{title}:</span> {description}
+                </p>
+              );
+            })}
           </div>
+          {ORUNDUM_FARMING_SUGGESTIONS.length > 6 && (
+            <button
+              type="button"
+              onClick={() => setShowAllSuggestions(!showAllSuggestions)}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+            >
+              {showAllSuggestions ? (
+                <>Thu gọn <ChevronUp className="size-4" /></>
+              ) : (
+                <>Xem thêm ({ORUNDUM_FARMING_SUGGESTIONS.length - 6}) <ChevronDown className="size-4" /></>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </TabsContent>
