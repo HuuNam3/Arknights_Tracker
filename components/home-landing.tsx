@@ -7,7 +7,6 @@ import {
   GalleryHorizontal,
   Hammer,
   ScrollText,
-  Shield,
   Shirt,
   Trophy,
   Users,
@@ -63,13 +62,6 @@ const primaryCards = [
 ] as const;
 
 const utilityCards = [
-  {
-    href: "/characters",
-    title: "Characters",
-    description: "Danh sách operator, release order và lọc nhanh theo rarity.",
-    icon: Shield,
-    tone: "border-emerald-200 bg-white text-emerald-900",
-  },
   {
     href: "/tier-list",
     title: "Tier List",

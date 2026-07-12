@@ -317,17 +317,19 @@ export function BannersTabContent({
                                         {Array.from({
                                           length: Number(banner.operatorRarities?.[operatorName] ?? 0),
                                         }).map((_, starIndex) => {
-                                          const rarity = Number(banner.operatorRarities?.[operatorName] ?? 0);
+                                          const starRarity = Number(banner.operatorRarities?.[operatorName] ?? 0);
+                                          const starColor =
+                                            starRarity === 6
+                                              ? "fill-orange-500 text-orange-500"
+                                              : starRarity === 5
+                                                ? "fill-yellow-500 text-yellow-500"
+                                                : starRarity === 4
+                                                  ? "fill-purple-500 text-purple-500"
+                                                  : "fill-slate-400 text-slate-400";
                                           return (
                                             <Star
                                               key={starIndex}
-                                              className={`h-3 w-3 ${
-                                                rarity === 6
-                                                  ? "fill-orange-500 text-orange-500"
-                                                  : rarity === 5
-                                                    ? "fill-yellow-500 text-yellow-500"
-                                                    : "fill-slate-400 text-slate-400"
-                                                }`}
+                                              className={`h-3 w-3 ${starColor}`}
                                             />
                                           );
                                         })}

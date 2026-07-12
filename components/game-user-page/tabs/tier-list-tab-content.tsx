@@ -444,12 +444,22 @@ export function TierListTabContent({
                                     </div>
                                     {rarity > 0 ? (
                                       <div className="mt-2 flex items-center gap-0.5">
-                                        {Array.from({ length: rarity }).map((_, starIndex) => (
-                                          <Star
-                                            key={`selected-tier-search-${operator.name}-${tier}-star-${starIndex}`}
-                                            className="h-3.5 w-3.5 fill-amber-500 text-amber-500"
-                                          />
-                                        ))}
+                                        {Array.from({ length: rarity }).map((_, starIndex) => {
+                                          const starColor =
+                                            rarity === 6
+                                              ? "fill-orange-500 text-orange-500"
+                                              : rarity === 5
+                                                ? "fill-yellow-500 text-yellow-500"
+                                                : rarity === 4
+                                                  ? "fill-purple-500 text-purple-500"
+                                                  : "fill-slate-400 text-slate-400";
+                                          return (
+                                            <Star
+                                              key={`selected-tier-search-${operator.name}-${tier}-star-${starIndex}`}
+                                              className={`h-3.5 w-3.5 ${starColor}`}
+                                            />
+                                          );
+                                        })}
                                       </div>
                                     ) : (
                                       <p className="mt-2 text-xs text-slate-500">Không rõ sao</p>

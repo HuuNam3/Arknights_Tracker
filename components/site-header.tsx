@@ -74,12 +74,6 @@ const getNavToneStyles = (tone: HeaderNavTone, active: boolean) => {
       idleItem: "bg-white/50 text-slate-600 hover:border-sky-200 hover:bg-sky-50/70 hover:text-sky-900",
       idleIcon: "bg-sky-100 text-sky-600",
     },
-    emerald: {
-      activeItem: "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-sm",
-      activeIcon: "bg-emerald-200 text-emerald-800",
-      idleItem: "bg-white/50 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50/70 hover:text-emerald-900",
-      idleIcon: "bg-emerald-100 text-emerald-600",
-    },
     cyan: {
       activeItem: "border-cyan-300 bg-cyan-50 text-cyan-800 shadow-sm",
       activeIcon: "bg-cyan-200 text-cyan-800",

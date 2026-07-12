@@ -1,4 +1,4 @@
-export type MainTab = "tools" | "characters" | "banners" | "skins" | "tierlist" | "events" | "gacha";
+export type MainTab = "tools" | "banners" | "skins" | "tierlist" | "events" | "gacha";
 
 export type ToolTab = "pull-planner" | "recruitment" | "operator-planner" | "skin-planner";
 
@@ -8,7 +8,6 @@ export type HeaderNavTone =
   | "rose"
   | "sky"
   | "purple"
-  | "emerald"
   | "cyan";
 
 export type HeaderNavIcon =
@@ -29,7 +28,6 @@ export const TOOL_TAB_PATHS: Record<ToolTab, string> = {
 };
 
 export const MAIN_TAB_PATHS: Record<Exclude<MainTab, "tools">, string> = {
-  characters: "/characters",
   banners: "/banners",
   skins: "/skins",
   tierlist: "/tier-list",
@@ -46,7 +44,6 @@ export const HEADER_NAV_ITEMS = [
   { href: "/skins", label: "Skins", icon: "shirt", tone: "purple" },
   { href: "/tools/pull-planner", label: "Pull Planner", icon: "diamond", tone: "amber" },
   { href: "/tools/recruitment-calculator", label: "Recruitment", icon: "users", tone: "rose" },
-  { href: "/characters", label: "Characters", icon: "users", tone: "emerald" },
   { href: "/tier-list", label: "Tier List", icon: "trophy", tone: "amber" },
   { href: "/news", label: "Tin tức", icon: "scroll", tone: "cyan" },
   { href: "/gacha", label: "Gacha", icon: "diamond", tone: "rose" },

@@ -464,12 +464,22 @@ export function RecruitmentTabContent({
                                 {operator.name}
                               </p>
                               <div className="mt-1 flex items-center gap-0.5">
-                                {Array.from({ length: operator.rarity }).map((_, index) => (
-                                  <Star
-                                    key={`${combo.tags.join("|")}-${operator.name}-star-${index}`}
-                                    className="h-3 w-3 fill-amber-500 text-amber-500"
-                                  />
-                                ))}
+                                {Array.from({ length: operator.rarity }).map((_, index) => {
+                                  const starColor =
+                                    operator.rarity === 6
+                                      ? "fill-orange-500 text-orange-500"
+                                      : operator.rarity === 5
+                                        ? "fill-yellow-500 text-yellow-500"
+                                        : operator.rarity === 4
+                                          ? "fill-purple-500 text-purple-500"
+                                          : "fill-slate-400 text-slate-400";
+                                  return (
+                                    <Star
+                                      key={`${combo.tags.join("|")}-${operator.name}-star-${index}`}
+                                      className={`h-3 w-3 ${starColor}`}
+                                    />
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>

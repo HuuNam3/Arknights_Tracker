@@ -61,7 +61,7 @@ import {
 } from "@/lib/tier-list-validation";
 import { BannersTabContent } from "@/components/game-user-page/tabs/banners-tab-content";
 import { SkinsTabContent, type UpcomingSkin } from "@/components/game-user-page/tabs/skins-tab-content";
-import { CharactersTabContent } from "@/components/game-user-page/tabs/characters-tab-content";
+
 import { GachaTabContent } from "@/components/game-user-page/tabs/gacha-tab-content";
 import { NewsTabContent } from "@/components/game-user-page/tabs/news-tab-content";
 import { TierListTabContent } from "@/components/game-user-page/tabs/tier-list-tab-content";
@@ -2091,9 +2091,6 @@ export function GameUserPage({
   const [operatorData, setOperatorData] = useState<OperatorRelease[]>([]);
   const [isOperatorLoading, setIsOperatorLoading] = useState(false);
   const [operatorError, setOperatorError] = useState("");
-  const [operatorSearch, setOperatorSearch] = useState("");
-  const [operatorStarFilter, setOperatorStarFilter] = useState("all");
-  const [operatorPage, setOperatorPage] = useState(1);
   const [bannerData, setBannerData] = useState<BannerRelease[]>([]);
   const [isBannerLoading, setIsBannerLoading] = useState(false);
   const [bannerError, setBannerError] = useState("");
@@ -2302,36 +2299,6 @@ export function GameUserPage({
 
     return [...merged.values()];
   })();
-  const filteredOperators = [...combinedOperatorData]
-    .sort((a, b) => {
-      const aIsReleased = a.globalReleased;
-      const bIsReleased = b.globalReleased;
-
-      if (aIsReleased !== bIsReleased) {
-        return aIsReleased ? 1 : -1;
-      }
-
-      const aSortTs = aIsReleased
-        ? Date.parse(`${a.enReleaseDate ?? a.releaseDate}T00:00:00Z`)
-        : Date.parse(`${a.cnReleaseDate ?? a.releaseDate}T00:00:00Z`);
-      const bSortTs = bIsReleased
-        ? Date.parse(`${b.enReleaseDate ?? b.releaseDate}T00:00:00Z`)
-        : Date.parse(`${b.cnReleaseDate ?? b.releaseDate}T00:00:00Z`);
-
-      return bSortTs - aSortTs;
-    })
-    .filter((operator) => {
-      const keyword = operatorSearch.trim().toLowerCase();
-      const rarityValue = getOperatorRarityValue(operator);
-      const starMatches =
-        operatorStarFilter === "all"
-          ? true
-          : rarityValue === Number(operatorStarFilter);
-
-      if (!keyword) return starMatches;
-
-      return starMatches && operator.name.toLowerCase().includes(keyword);
-    });
   const upcomingNewOperatorsByBanner = (() => {
     const releasedOperatorNames = new Set(
       operatorData
@@ -2880,17 +2847,6 @@ export function GameUserPage({
           .sort((a, b) => a.name.localeCompare(b.name)),
       }))
     : [];
-  const OPERATORS_PER_PAGE = 15;
-  const operatorTotalPages = Math.max(
-    1,
-    Math.ceil(filteredOperators.length / OPERATORS_PER_PAGE),
-  );
-  const paginatedOperators = filteredOperators.slice(
-    (operatorPage - 1) * OPERATORS_PER_PAGE,
-    operatorPage * OPERATORS_PER_PAGE,
-  );
-
-
   const readJsonResponse = async (res: Response) => {
     const raw = await res.text();
     const contentType = res.headers.get("content-type") ?? "";
@@ -3027,18 +2983,8 @@ export function GameUserPage({
   }, []);
 
   useEffect(() => {
-    setOperatorPage(1);
-  }, [operatorSearch, operatorStarFilter]);
-
-  useEffect(() => {
     setTierPoolPage(1);
   }, [tierSearch, tierStarFilter]);
-
-  useEffect(() => {
-    if (operatorPage > operatorTotalPages) {
-      setOperatorPage(operatorTotalPages);
-    }
-  }, [operatorPage, operatorTotalPages]);
 
   useEffect(() => {
     if (tierPoolPage > tierPoolTotalPages) {
@@ -3898,23 +3844,6 @@ export function GameUserPage({
                   }}
                 />
               </TabsContent>
-
-              <CharactersTabContent
-                filteredOperators={filteredOperators}
-                formatDisplayDate={formatDisplayDate}
-                getOperatorRarityValue={getOperatorRarityValue}
-                getWikiImageName={getWikiImageName}
-                isOperatorLoading={isOperatorLoading}
-                operatorError={operatorError}
-                operatorPage={operatorPage}
-                operatorSearch={operatorSearch}
-                operatorStarFilter={operatorStarFilter}
-                operatorTotalPages={operatorTotalPages}
-                paginatedOperators={paginatedOperators}
-                setOperatorPage={setOperatorPage}
-                setOperatorSearch={setOperatorSearch}
-                setOperatorStarFilter={setOperatorStarFilter}
-              />
 
               <BannersTabContent
                 bannerError={bannerError}
