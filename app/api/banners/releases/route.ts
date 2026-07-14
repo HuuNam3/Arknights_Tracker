@@ -291,16 +291,18 @@ const parseYearPageBannerRows = (html: string, sourcePage: string) =>
 const isBannerCurrentOnGlobal = (enStartDate: string | null, enEndDate: string | null) => {
   if (!enStartDate) return false;
 
-  const today = new Date();
-  const todayUtc = Date.UTC(
-    today.getUTCFullYear(),
-    today.getUTCMonth(),
-    today.getUTCDate(),
-  );
+  const vietnamMs = Date.now() + 7 * 60 * 60 * 1000;
+  const vietnamDate = new Date(vietnamMs);
+  const todayStr = `${vietnamDate.getUTCFullYear()}-${String(vietnamDate.getUTCMonth() + 1).padStart(2, '0')}-${String(vietnamDate.getUTCDate()).padStart(2, '0')}`;
   const startTs = Date.parse(`${enStartDate}T00:00:00Z`);
   const endTs = Date.parse(`${enEndDate ?? enStartDate}T23:59:59Z`);
 
-  return Number.isFinite(startTs) && Number.isFinite(endTs) && todayUtc >= startTs && todayUtc <= endTs;
+  return (
+    Number.isFinite(startTs) &&
+    Number.isFinite(endTs) &&
+    enStartDate <= todayStr &&
+    (enEndDate ? enEndDate >= todayStr : todayStr === enStartDate)
+  );
 };
 
 const isValidOperatorCandidate = (value: string, bannerName: string) => {
@@ -844,13 +846,22 @@ export async function GET() {
       (b) => b.cnStartDate !== null && b.enStartDate !== null,
     );
     data = data.filter((banner) => {
-      if (!banner.enStartDate) return true;
+      const vietnamMs = Date.now() + 7 * 60 * 60 * 1000;
+      const vietnamDate = new Date(vietnamMs);
+      const todayStr = `${vietnamDate.getUTCFullYear()}-${String(vietnamDate.getUTCMonth() + 1).padStart(2, '0')}-${String(vietnamDate.getUTCDate()).padStart(2, '0')}`;
+
+      if (banner.enEndDate && banner.enEndDate < todayStr) return false;
 
       if (banner.current) return true;
 
-      const today = new Date();
-      const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+      if (!banner.enStartDate) return true;
+
       const bannerTs = Date.parse(`${banner.enStartDate}T00:00:00Z`);
+      const todayUtc = Date.UTC(
+        new Date().getUTCFullYear(),
+        new Date().getUTCMonth(),
+        new Date().getUTCDate(),
+      );
       return !(Number.isFinite(bannerTs) && bannerTs < todayUtc);
     });
 
