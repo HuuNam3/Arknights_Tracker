@@ -2059,11 +2059,12 @@ export function GameUserPage({
   } | null>(null);
   const [isGachaLoading, setIsGachaLoading] = useState(false);
   const [gachaAttempted, setGachaAttempted] = useState(false);
-  const [gachaPage, setGachaPage] = useState(1);
-  const [gachaTotalPages, setGachaTotalPages] = useState(1);
-  const [gachaPageSize, setGachaPageSize] = useState(10);
+  const [gachaNextPage, setGachaNextPage] = useState(1);
+  const [gachaHasMore, setGachaHasMore] = useState(false);
+  const [gachaDisplayLimit, setGachaDisplayLimit] = useState(20);
+  const [gachaBannerFilter, setGachaBannerFilter] = useState("all");
   const [gachaTypeFilter, setGachaTypeFilter] = useState("all");
-  const [showGachaSixStarOnly, setShowGachaSixStarOnly] = useState(false);
+  const [gachaStarFilter, setGachaStarFilter] = useState<string[]>(["6"]);
   const [tierListView, setTierListView] = useState("browse");
   const [tierAssignments, setTierAssignments] = useState<TierAssignmentMap>({});
   const [tierOrder, setTierOrder] = useState<string[]>([...DEFAULT_TIER_ORDER]);
@@ -2735,9 +2736,11 @@ export function GameUserPage({
       );
     })
     .sort((a, b) => (a.durationStart || 0) - (b.durationStart || 0));
-  const activeGachaSource = showGachaSixStarOnly
+  const shouldFetchAll = gachaStarFilter.length === 1 && gachaStarFilter[0] === "6";
+  const activeGachaSource = shouldFetchAll
     ? (gachaAllData ?? [])
     : (gachaData ?? []);
+
   const filteredGachaData = (() => {
     const entries =
       activeGachaSource.map((item: any, index: number) => ({
@@ -2761,42 +2764,66 @@ export function GameUserPage({
       return aTs - bTs;
     });
 
-    let pityCount = 0;
     const pityByIndex = new Map<number, number>();
+    const bannerTotalByIndex = new Map<number, number>();
+    const pityByBanner = new Map<string, { count: number; total: number }>();
 
     for (const entry of chronologicalEntries) {
-      pityCount += 1;
+      const bannerKey = entry.item.poolName || "unknown";
+
+      let bannerPity = pityByBanner.get(bannerKey);
+
+      if (!bannerPity) {
+        bannerPity = { count: 0, total: 0 };
+        pityByBanner.set(bannerKey, bannerPity);
+      }
+
+      bannerPity.total += 1;
+      bannerPity.count += 1;
 
       if (entry.starValue === 6) {
-        pityByIndex.set(entry.index, pityCount);
-        pityCount = 0;
+        pityByIndex.set(entry.index, bannerPity.count);
+        bannerTotalByIndex.set(entry.index, bannerPity.total);
+        bannerPity.count = 0;
       }
     }
 
     return entries
       .filter((entry) =>
-        gachaTypeFilter === "all"
+        gachaBannerFilter === "all"
           ? true
-          : String(entry.item.typeName)
-              .toLowerCase()
-              .includes(gachaTypeFilter.toLowerCase()),
+          : entry.item.poolName === gachaBannerFilter,
       )
-      .filter((entry) => (showGachaSixStarOnly ? entry.starValue === 6 : true))
+      .filter((entry) =>
+        gachaStarFilter.length === 0 ? true : gachaStarFilter.includes(String(entry.starValue)),
+      )
       .map((entry) => ({
         ...entry,
         pityCount: pityByIndex.get(entry.index) ?? null,
+        bannerTotalPulls: bannerTotalByIndex.get(entry.index) ?? null,
       }));
   })();
-  const effectiveGachaPageSize = showGachaSixStarOnly ? 15 : gachaPageSize;
-  const effectiveGachaTotalPages = showGachaSixStarOnly
-    ? Math.max(1, Math.ceil(filteredGachaData.length / effectiveGachaPageSize))
-    : gachaTotalPages;
-  const paginatedGachaData = showGachaSixStarOnly
-    ? filteredGachaData.slice(
-        (gachaPage - 1) * effectiveGachaPageSize,
-        gachaPage * effectiveGachaPageSize,
-      )
+  const paginatedGachaData = shouldFetchAll
+    ? filteredGachaData.slice(0, gachaDisplayLimit)
     : filteredGachaData;
+  const bannerTotalPullMap = new Map<string, number>();
+  for (const item of activeGachaSource) {
+    const name = item.poolName || "Unknown";
+    bannerTotalPullMap.set(name, (bannerTotalPullMap.get(name) ?? 0) + 1);
+  }
+
+  const gachaGroupedData = paginatedGachaData.reduce<
+    Array<{ bannerName: string; totalPulls: number; pulls: typeof paginatedGachaData }>
+  >((groups, entry) => {
+    const bannerName = entry.item.poolName || "Unknown";
+    const last = groups[groups.length - 1];
+    if (last && last.bannerName === bannerName) {
+      last.pulls.push(entry);
+    } else {
+      groups.push({ bannerName, totalPulls: bannerTotalPullMap.get(bannerName) ?? 0, pulls: [entry] });
+    }
+    return groups;
+  }, []);
   const tierCandidates = [...combinedOperatorData]
     .filter((operator) =>
       operator.name.toLowerCase().includes(tierSearch.trim().toLowerCase()),
@@ -3185,20 +3212,16 @@ export function GameUserPage({
   }, [hasHydratedPullPlanner, pullPlanner.currentBannerKey, pullPlannerTargets]);
 
   useEffect(() => {
-    setGachaPage(1);
+    setGachaDisplayLimit(20);
+    setGachaNextPage(1);
+    setGachaHasMore(false);
 
     if (!gachaAttempted || !cookieToken.trim()) {
       return;
     }
 
-    void handleSearchGacha(1, showGachaSixStarOnly ? 15 : gachaPageSize);
-  }, [showGachaSixStarOnly]);
-
-  useEffect(() => {
-    if (gachaPage > effectiveGachaTotalPages) {
-      setGachaPage(effectiveGachaTotalPages);
-    }
-  }, [gachaPage, effectiveGachaTotalPages]);
+    void handleSearchGacha();
+  }, [gachaStarFilter.join(",")]);
 
   const handleSearch = async () => {
     await lookupUserInfo(uid, { showLoading: true });
@@ -3608,33 +3631,31 @@ export function GameUserPage({
     }
   }
 
-  const handleSearchGacha = async (page: number = 1, size?: number) => {
+  const handleSearchGacha = async () => {
     setGachaAttempted(true);
     if (!cookieToken.trim()) return;
 
-    const pageSize = size ?? gachaPageSize;
+    const pageSize = 20;
     setIsGachaLoading(true);
     setErrorMessage("");
     try {
-      const result = showGachaSixStarOnly
+      const result = shouldFetchAll
         ? await fetchAllGachaData()
-        : await fetchGachaPageData(page, pageSize);
+        : await fetchGachaPageData(1, pageSize);
       if (result.code === 0 && result.data?.rows) {
         localStorage.setItem("arknights_cookie", cookieToken);
-        if (showGachaSixStarOnly) {
+        if (shouldFetchAll) {
           setGachaAllData(result.data.rows);
-          setGachaPage(1);
-          setGachaTotalPages(1);
+          setGachaData(result.data.rows);
+          setGachaDisplayLimit(20);
         } else {
           setGachaData(result.data.rows);
-          setGachaPage(page);
-        }
-        const total = result.data.count || result.data.rows.length;
-        if (!showGachaSixStarOnly) {
-          setGachaTotalPages(Math.ceil(total / pageSize));
+          const total = result.data.count || result.data.rows.length;
+          setGachaHasMore(total > pageSize);
+          setGachaNextPage(2);
         }
         const stats = {
-          total,
+          total: result.data.count || result.data.rows.length,
           sixStar: result.data.rows.filter((r: any) => r.star === "6\u661f")
             .length,
           fiveStar: result.data.rows.filter((r: any) => r.star === "5\u661f")
@@ -3655,27 +3676,36 @@ export function GameUserPage({
     }
   };
 
-  const handleGachaPageChange = (page: number) => {
-    if (showGachaSixStarOnly) {
-      setGachaPage(page);
+  const handleGachaLoadMore = async () => {
+    if (shouldFetchAll) {
+      setGachaDisplayLimit((prev) => prev + 20);
       return;
     }
 
-    handleSearchGacha(page);
-  };
+    if (isGachaLoading || !gachaHasMore) return;
 
-  const handleGachaSizeChange = (newSize: number) => {
-    if (showGachaSixStarOnly) {
-      return;
+    const pageSize = 20;
+    setIsGachaLoading(true);
+    try {
+      const result = await fetchGachaPageData(gachaNextPage, pageSize);
+      if (result.code === 0 && result.data?.rows) {
+        setGachaData((prev) =>
+          prev ? [...prev, ...result.data.rows] : result.data.rows,
+        );
+        const total = result.data.count || result.data.rows.length;
+        setGachaHasMore(gachaNextPage * pageSize < total);
+        setGachaNextPage((prev) => prev + 1);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGachaLoading(false);
     }
-
-    setGachaPageSize(newSize);
-    handleSearchGacha(1, newSize);
   };
 
   const handleGachaKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      handleSearchGacha(1);
+      handleSearchGacha();
     }
   };
 
@@ -3924,25 +3954,20 @@ export function GameUserPage({
 
               <GachaTabContent
                 cookieToken={cookieToken}
-                effectiveGachaTotalPages={effectiveGachaTotalPages}
                 errorMessage={errorMessage}
                 filteredGachaData={filteredGachaData}
                 gachaAttempted={gachaAttempted}
                 gachaData={gachaData}
-                gachaPage={gachaPage}
-                gachaPageSize={gachaPageSize}
-                gachaTypeFilter={gachaTypeFilter}
+                gachaGroupedData={gachaGroupedData}
+                gachaHasMore={gachaHasMore}
                 getWikiImageName={getWikiImageName}
                 handleGachaKeyPress={handleGachaKeyPress}
-                handleGachaPageChange={handleGachaPageChange}
-                handleGachaSizeChange={handleGachaSizeChange}
+                handleGachaLoadMore={handleGachaLoadMore}
                 handleSearchGacha={handleSearchGacha}
                 isGachaLoading={isGachaLoading}
-                paginatedGachaData={paginatedGachaData}
                 setCookieToken={setCookieToken}
-                setGachaTypeFilter={setGachaTypeFilter}
-                setShowGachaSixStarOnly={setShowGachaSixStarOnly}
-                showGachaSixStarOnly={showGachaSixStarOnly}
+                setGachaStarFilter={setGachaStarFilter}
+                gachaStarFilter={gachaStarFilter}
               />
             </Tabs>
           </div>
